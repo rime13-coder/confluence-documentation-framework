@@ -1,0 +1,75 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart TB
+    title["<b>Network Architecture — Current State vs Target State</b>"]
+    style title fill:none,stroke:none
+
+    subgraph current ["CURRENT STATE — No VNet (MVP)"]
+        direction TB
+
+        Internet1["Internet"]
+
+        subgraph dns1 ["GoDaddy DNS"]
+            CNAME1["cmmc.intellisecops.com<br/>api.cmmc.intellisecops.com"]
+        end
+
+        subgraph public1 ["All Public Endpoints"]
+            direction TB
+            Web1["<b>cmmc-web</b><br/>External ingress<br/>Azure Managed TLS"]
+            API1["<b>cmmc-api</b><br/>External ingress<br/>Azure Managed TLS"]
+            PG1["<b>PostgreSQL</b><br/>Firewall: AllowAzureServices<br/>0.0.0.0 ⚠️"]
+            Blob1["<b>Blob Storage</b><br/>Public access ⚠️"]
+            KV1["<b>Key Vault</b><br/>Public access ⚠️"]
+        end
+
+        Internet1 -->|"HTTPS"| CNAME1
+        CNAME1 -->|"CNAME"| Web1
+        CNAME1 -->|"CNAME"| API1
+        API1 -->|"Public internet ⚠️"| PG1
+        API1 -->|"Public internet ⚠️"| Blob1
+        API1 -->|"Public internet ⚠️"| KV1
+    end
+
+    subgraph target ["TARGET STATE — VNet with Private Endpoints"]
+        direction TB
+
+        Internet2["Internet"]
+
+        subgraph dns2 ["GoDaddy DNS + Azure Private DNS"]
+            CNAME2["cmmc.intellisecops.com<br/>api.cmmc.intellisecops.com"]
+        end
+
+        subgraph vnet ["VNet: vnet-cmmc-assessor-prod — 10.0.0.0/16"]
+            direction TB
+
+            subgraph snet_ca ["snet-container-apps — 10.0.0.0/23<br/>Delegated: Microsoft.App/environments"]
+                Web2["<b>cmmc-web</b><br/>Internal + External ingress<br/>TLS 1.2+"]
+                API2["<b>cmmc-api</b><br/>Internal + External ingress<br/>TLS 1.2+"]
+            end
+
+            subgraph snet_pg ["snet-postgresql — 10.0.2.0/24<br/>Delegated: Microsoft.DBforPostgreSQL"]
+                PG2["<b>PostgreSQL</b><br/>VNet-integrated<br/>No public access"]
+            end
+
+            subgraph snet_pe ["snet-private-endpoints — 10.0.3.0/24"]
+                PE_KV["Private Endpoint<br/>Key Vault"]
+                PE_Blob["Private Endpoint<br/>Blob Storage"]
+            end
+        end
+
+        Internet2 -->|"HTTPS"| CNAME2
+        CNAME2 -->|"CNAME"| Web2
+        CNAME2 -->|"CNAME"| API2
+        API2 -->|"Private VNet ✓"| PG2
+        API2 -->|"Private Endpoint ✓"| PE_KV
+        API2 -->|"Private Endpoint ✓"| PE_Blob
+    end
+
+    style current fill:#fff5f5,stroke:#ef4444,stroke-width:2px
+    style target fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+    style public1 fill:#fef2f2,stroke:#dc2626
+    style vnet fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style snet_ca fill:#dbeafe,stroke:#2563eb
+    style snet_pg fill:#dcfce7,stroke:#16a34a
+    style snet_pe fill:#f3e8ff,stroke:#7c3aed
+    style dns1 fill:#f0f0f0,stroke:#888
+    style dns2 fill:#f0f0f0,stroke:#888

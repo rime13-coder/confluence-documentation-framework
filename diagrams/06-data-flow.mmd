@@ -1,0 +1,73 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart LR
+    title["<b>Data Flow Diagram — CMMC Assessor Platform</b>"]
+    style title fill:none,stroke:none
+
+    subgraph users ["External Actors"]
+        Assessor["Assessor /<br/>Compliance Officer"]
+        TenantAdmin["Tenant Admin"]
+    end
+
+    subgraph frontend ["Frontend — cmmc-web"]
+        UI["React SPA<br/><i>TanStack Query Cache</i>"]
+    end
+
+    subgraph backend ["Backend — cmmc-api"]
+        direction TB
+        AuthCtrl["Auth Controller"]
+        AssessCtrl["Assessment Controller"]
+        EvidCtrl["Evidence Controller"]
+        PolicyCtrl["Policy Controller"]
+        SSPCtrl["SSP Generator"]
+        AuditCtrl["Audit Logger"]
+    end
+
+    subgraph datastores ["Data Stores"]
+        direction TB
+        PG[("PostgreSQL 17<br/><i>22 tables</i><br/>User PII, assessments,<br/>controls, policies,<br/>encrypted tokens,<br/>audit logs")]
+        Blob[("Azure Blob Storage<br/><i>stcmmcassessorprod</i><br/>Evidence uploads,<br/>generated DOCX/PDF")]
+        SP[("SharePoint<br/><i>via Graph API</i><br/>Tenant evidence<br/>document libraries")]
+    end
+
+    subgraph secrets ["Secrets"]
+        KV["Azure Key Vault<br/><i>kv-cmmc-assessor-prod</i><br/>DB creds, JWT keys,<br/>MSAL secrets, AES keys"]
+    end
+
+    subgraph identity ["Identity"]
+        Entra["Microsoft Entra ID<br/><i>OAuth 2.0 tokens</i><br/>User authentication"]
+    end
+
+    Assessor -->|"Score controls,<br/>upload evidence"| UI
+    TenantAdmin -->|"Manage team,<br/>configure policies"| UI
+
+    UI -->|"HTTPS REST<br/>Bearer JWT"| AuthCtrl
+    UI -->|"HTTPS REST<br/>Bearer JWT"| AssessCtrl
+    UI -->|"HTTPS REST<br/>Bearer JWT"| EvidCtrl
+    UI -->|"HTTPS REST<br/>Bearer JWT"| PolicyCtrl
+    UI -->|"HTTPS REST<br/>Bearer JWT"| SSPCtrl
+
+    AuthCtrl -->|"OAuth 2.0 code exchange<br/>MSAL 2.15"| Entra
+    AuthCtrl -->|"User, RefreshToken,<br/>TokenDenyList"| PG
+
+    AssessCtrl -->|"Assessment, Control,<br/>ObjectiveResponse,<br/>ControlImplementation"| PG
+    AssessCtrl --> AuditCtrl
+
+    EvidCtrl -->|"Small files<br/>(direct upload)"| Blob
+    EvidCtrl -->|"SharePoint files<br/>(delegated token)"| SP
+    EvidCtrl -->|"POAMEvidence<br/>metadata"| PG
+
+    PolicyCtrl -->|"TenantPolicy,<br/>PolicyVersion,<br/>Acknowledgment"| PG
+
+    SSPCtrl -->|"SSPConfig,<br/>Assessment data"| PG
+    SSPCtrl -->|"Generated DOCX"| Blob
+
+    AuditCtrl -->|"Append-only<br/>AuditLog entries"| PG
+
+    backend -->|"Secret retrieval<br/>at startup + on-demand"| KV
+
+    style users fill:#e8f4fd,stroke:#2374ab
+    style frontend fill:#dbeafe,stroke:#2563eb
+    style backend fill:#dcfce7,stroke:#16a34a
+    style datastores fill:#fef3c7,stroke:#d97706
+    style secrets fill:#f3e8ff,stroke:#7c3aed
+    style identity fill:#fce7f3,stroke:#db2777

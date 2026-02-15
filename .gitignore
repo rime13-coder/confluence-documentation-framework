@@ -3,10 +3,14 @@
 
 # Confluence credentials (NEVER commit)
 scripts/config.yaml
+scripts/config.json
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Rendered diagram images (generated from .mmd source)
+diagrams/*.png
 
 # Editor files
 .vscode/

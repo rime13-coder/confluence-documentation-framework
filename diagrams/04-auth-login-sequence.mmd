@@ -1,0 +1,39 @@
+sequenceDiagram
+    title Entra ID Login Flow — OAuth 2.0 Authorization Code + PKCE
+
+    actor User as Assessor
+    participant Web as cmmc-web<br/>(React SPA)
+    participant API as cmmc-api<br/>(Express API)
+    participant Entra as Microsoft<br/>Entra ID
+    participant DB as PostgreSQL
+
+    User->>Web: Click "Sign in with Microsoft"
+    Web->>API: GET /api/auth/login
+    API->>API: Generate PKCE code_verifier + code_challenge
+    API->>API: Store code_verifier in session
+    API-->>Web: 302 Redirect to Entra ID authorize endpoint
+
+    Web->>Entra: GET /oauth2/v2.0/authorize<br/>?response_type=code<br/>&code_challenge={challenge}<br/>&scope=openid profile email
+    Entra->>User: Show Microsoft login page
+    User->>Entra: Enter credentials + MFA (if required)
+    Entra-->>Web: 302 Redirect to /api/auth/callback?code={auth_code}
+
+    Web->>API: GET /api/auth/callback?code={auth_code}
+    API->>Entra: POST /oauth2/v2.0/token<br/>(auth_code + code_verifier via MSAL 2.15)
+    Entra-->>API: { access_token, id_token, refresh_token }
+
+    API->>API: Validate ID token claims (oid, email, name, tid)
+
+    API->>DB: Find or create User (by entraIdObjectId)
+    DB-->>API: User record
+
+    API->>DB: Resolve Tenant (by entraIdTenantId / tid)
+    DB-->>API: Tenant + TeamMember record
+
+    API->>API: Generate custom JWT (7-day expiry)<br/>payload: { userId, tenantId, platformRole, teamRole }
+    API->>DB: Create RefreshToken (family-based, 30-day expiry)
+    DB-->>API: RefreshToken stored
+
+    API-->>Web: { accessToken (JWT), refreshToken, user profile }
+    Web->>Web: Store JWT in memory / httpOnly cookie
+    Web-->>User: Redirect to dashboard

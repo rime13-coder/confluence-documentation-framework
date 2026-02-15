@@ -1,0 +1,60 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart LR
+    title["<b>CI Pipeline Flow — ci.yml</b><br/><i>Trigger: PR to main/develop, push to develop | Total: 5-8 min</i>"]
+    style title fill:none,stroke:none
+
+    Trigger["PR / Push<br/>to main or develop"]
+
+    subgraph parallel ["Parallel Jobs"]
+        direction TB
+
+        subgraph job1 ["backend-ci"]
+            direction LR
+            B1["Checkout"] --> B2["Setup<br/>Node.js 20"]
+            B2 --> B3["npm ci"]
+            B3 --> B4["prisma<br/>generate"]
+            B4 --> B5["tsc<br/>--noEmit"]
+            B5 --> B6["ESLint"]
+            B6 --> B7["npm test"]
+            B7 --> B8["npm run<br/>build"]
+        end
+
+        subgraph job2 ["frontend-ci"]
+            direction LR
+            F1["Checkout"] --> F2["Setup<br/>Node.js 20"]
+            F2 --> F3["npm ci"]
+            F3 --> F4["tsc<br/>--noEmit"]
+            F4 --> F5["ESLint"]
+            F5 --> F6["npm test"]
+            F6 --> F7["npm run build<br/>(VITE_API_URL)"]
+        end
+
+        subgraph job3 ["security-scan"]
+            direction LR
+            S1["CodeQL<br/>Init"] --> S2["Autobuild"]
+            S2 --> S3["CodeQL<br/>Analyze"]
+        end
+
+        subgraph job4 ["dependency-audit"]
+            direction LR
+            D1["npm audit<br/>backend<br/>--audit-level=high"] --> D2["npm audit<br/>frontend<br/>--audit-level=high"]
+        end
+    end
+
+    Result{{"All checks<br/>pass?"}}
+    Merge["Merge<br/>allowed"]
+    Block["PR<br/>blocked"]
+
+    Trigger --> parallel
+    parallel --> Result
+    Result -->|"Yes"| Merge
+    Result -->|"No"| Block
+
+    style Trigger fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style parallel fill:#e8f4fd,stroke:#2374ab,stroke-width:2px
+    style job1 fill:#dcfce7,stroke:#16a34a
+    style job2 fill:#dbeafe,stroke:#2563eb
+    style job3 fill:#fce7f3,stroke:#db2777
+    style job4 fill:#fef3c7,stroke:#d97706
+    style Merge fill:#16a34a,color:#fff,stroke:#15803d
+    style Block fill:#dc2626,color:#fff,stroke:#b91c1c

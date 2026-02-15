@@ -1,0 +1,50 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1a5a8a', 'lineColor': '#555', 'secondaryColor': '#e8f4fd', 'tertiaryColor': '#f0f0f0'}}}%%
+flowchart TB
+    subgraph boundary [" "]
+        direction TB
+        title["<b>Container Diagram — CMMC Assessor Platform</b><br/><i>C4 Level 2</i>"]
+        style title fill:none,stroke:none
+
+        User["<b>Assessor / Admin</b><br/><i>Person</i>"]
+
+        subgraph azure ["Azure — rg-cmmc-assessor-prod"]
+            direction TB
+
+            subgraph cae ["Container Apps Environment<br/>cae-cmmc-assessor-prod"]
+                Web["<b>cmmc-web</b><br/><i>Container App</i><br/>React 18.3 + TypeScript 5.6<br/>Vite 5.4 / Nginx<br/>0.25 CPU, 0.5Gi, 0-3 replicas"]
+                API["<b>cmmc-api</b><br/><i>Container App</i><br/>Node.js 20 + Express 4.21<br/>TypeScript 5.6 / Prisma 5.22<br/>0.5 CPU, 1Gi, 0-3 replicas"]
+            end
+
+            DB[("<b>psql-cmmc-assessor-prod</b><br/><i>Azure PostgreSQL Flexible Server</i><br/>PostgreSQL 17 / B1ms<br/>1 vCore, 2GB RAM, 32GB<br/>22 tables")]
+            Blob["<b>stcmmcassessorprod</b><br/><i>Azure Blob Storage</i><br/>Standard_LRS<br/>Evidence files, exports"]
+            KV["<b>kv-cmmc-assessor-prod</b><br/><i>Azure Key Vault</i><br/>Standard tier<br/>DB creds, JWT keys, MSAL secrets"]
+            ACR["<b>acrcmmcassessorprod</b><br/><i>Azure Container Registry</i><br/>Basic tier<br/>Docker images"]
+            Logs["<b>log-cmmc-assessor-prod</b><br/><i>Azure Log Analytics</i><br/>PerGB2018<br/>30-day retention"]
+        end
+
+        EntraID["<b>Microsoft Entra ID</b><br/><i>External</i>"]
+        GraphAPI["<b>Microsoft Graph API</b><br/><i>External</i>"]
+    end
+
+    User -->|"HTTPS<br/>cmmc.intellisecops.com"| Web
+    Web -->|"HTTPS REST API<br/>api.cmmc.intellisecops.com"| API
+    API -->|"TCP + SSL<br/>Prisma ORM"| DB
+    API -->|"HTTPS REST<br/>Storage SDK"| Blob
+    API -->|"HTTPS<br/>Secret retrieval"| KV
+    API -->|"OAuth 2.0 / OIDC<br/>MSAL 2.15"| EntraID
+    API -->|"HTTPS REST<br/>Delegated tokens"| GraphAPI
+    cae -->|"stdout/stderr"| Logs
+
+    style User fill:#08427b,color:#fff,stroke:#073a6b
+    style Web fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style API fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style DB fill:#2e7d32,color:#fff,stroke:#256b28
+    style Blob fill:#2e7d32,color:#fff,stroke:#256b28
+    style KV fill:#2e7d32,color:#fff,stroke:#256b28
+    style ACR fill:#2e7d32,color:#fff,stroke:#256b28
+    style Logs fill:#2e7d32,color:#fff,stroke:#256b28
+    style EntraID fill:#999,color:#fff,stroke:#777
+    style GraphAPI fill:#999,color:#fff,stroke:#777
+    style azure fill:#e8f4fd,stroke:#2374ab,stroke-width:2px
+    style cae fill:#d4eaf7,stroke:#1a5a8a,stroke-width:1px
+    style boundary fill:none,stroke:none

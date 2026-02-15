@@ -1,0 +1,51 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart LR
+    title["<b>CD Pipeline Flow — cd.yml</b><br/><i>Trigger: push to main or manual dispatch</i>"]
+    style title fill:none,stroke:none
+
+    Trigger["Push to main<br/>or Manual<br/>Dispatch"]
+
+    subgraph build ["Job 1: build-and-push"]
+        direction LR
+        BP1["Docker Buildx<br/>Setup"] --> BP2["Azure Login<br/>(OIDC)"]
+        BP2 --> BP3["ACR Login"]
+
+        subgraph images ["Docker Build + Push"]
+            direction TB
+            IMG1["Backend Image<br/>acrcmmcassessorprod.azurecr.io/<br/>cmmc-assessor-backend<br/>Tags: git-sha, latest"]
+            IMG2["Frontend Image<br/>acrcmmcassessorprod.azurecr.io/<br/>cmmc-assessor-frontend<br/>Tags: git-sha, latest"]
+        end
+
+        BP3 --> images
+    end
+
+    subgraph deploy ["Job 2: deploy (sequential)"]
+        direction LR
+        D1["Azure Login<br/>(OIDC)"] --> D2["Deploy Backend<br/>cmmc-api<br/>Port 3001"]
+        D2 --> D3["Deploy Frontend<br/>cmmc-web<br/>Port 80"]
+        D3 --> D4["Write Deployment<br/>Summary"]
+    end
+
+    subgraph azure ["Azure Container Apps"]
+        direction TB
+        Rev["New Revision<br/>Created"]
+        Health["Health Check<br/>Initiated"]
+        Traffic["Traffic Routed<br/>to New Revision"]
+        Rev --> Health --> Traffic
+    end
+
+    subgraph rollback ["Rollback (Manual)"]
+        RB["az containerapp update<br/>--image previous-sha"]
+    end
+
+    Trigger --> build
+    build -->|"Images pushed<br/>to ACR"| deploy
+    deploy -->|"container-apps-deploy-action@v1"| azure
+    azure -.->|"If failure"| rollback
+
+    style Trigger fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style build fill:#fef3c7,stroke:#d97706,stroke-width:2px
+    style deploy fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style azure fill:#dbeafe,stroke:#2563eb,stroke-width:2px
+    style rollback fill:#fef2f2,stroke:#dc2626,stroke-dasharray: 5 5
+    style images fill:#fff7ed,stroke:#ea580c

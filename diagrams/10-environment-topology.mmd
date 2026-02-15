@@ -1,0 +1,58 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart LR
+    title["<b>Environment Topology — Dev / Staging / Prod</b>"]
+    style title fill:none,stroke:none
+
+    subgraph dev ["Development — Local"]
+        direction TB
+        DevLabel["<b>Developer Machine</b><br/><i>Docker Compose</i><br/>Cost: $0"]
+        DevWeb["cmmc-web<br/><i>Vite HMR dev server</i><br/>localhost:5173"]
+        DevAPI["cmmc-api<br/><i>Node.js Express</i><br/>localhost:3001"]
+        DevDB[("PostgreSQL<br/><i>Docker container</i><br/>cmmc-assessor-dev")]
+        DevAuth["Entra ID<br/><i>Dev app registration</i>"]
+        DevStore["Local filesystem<br/><i>File uploads</i>"]
+
+        DevWeb --> DevAPI
+        DevAPI --> DevDB
+        DevAPI --> DevAuth
+        DevAPI --> DevStore
+    end
+
+    subgraph staging ["Staging — NOT IMPLEMENTED"]
+        direction TB
+        StagLabel["<b>Planned: Azure</b><br/><i>Separate resource group<br/>or subscription</i><br/>Pre-production validation"]
+        StagWeb["cmmc-web<br/><i>Container App</i><br/>staging.cmmc..."]
+        StagAPI["cmmc-api<br/><i>Container App</i>"]
+        StagDB[("PostgreSQL<br/><i>Staging instance</i><br/>Test data only")]
+
+        StagWeb --> StagAPI
+        StagAPI --> StagDB
+    end
+
+    subgraph prod ["Production — Azure Canada Central"]
+        direction TB
+        ProdLabel["<b>rg-cmmc-assessor-prod</b><br/><i>Live workloads</i><br/>Cost: ~$35-70 CAD/month"]
+        ProdWeb["cmmc-web<br/><i>Container App</i><br/>cmmc.intellisecops.com<br/>0.25 CPU / 0.5Gi / 0-3"]
+        ProdAPI["cmmc-api<br/><i>Container App</i><br/>api.cmmc.intellisecops.com<br/>0.5 CPU / 1Gi / 0-3"]
+        ProdDB[("PostgreSQL Flex<br/><i>B1ms</i><br/>1 vCore / 2GB / 32GB<br/>7-day PITR")]
+        ProdKV["Key Vault<br/><i>kv-cmmc-assessor-prod</i>"]
+        ProdBlob["Blob Storage<br/><i>stcmmcassessorprod</i>"]
+        ProdLogs["Log Analytics<br/><i>30-day retention</i>"]
+
+        ProdWeb --> ProdAPI
+        ProdAPI --> ProdDB
+        ProdAPI --> ProdKV
+        ProdAPI --> ProdBlob
+        ProdAPI --> ProdLogs
+    end
+
+    dev -->|"git push<br/>feature/* to develop"| staging
+    staging -->|"Promotion<br/>develop to main<br/>(planned)"| prod
+
+    style dev fill:#dbeafe,stroke:#2563eb,stroke-width:2px
+    style staging fill:#fef3c7,stroke:#d97706,stroke-width:2px,stroke-dasharray: 5 5
+    style prod fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    style StagLabel fill:#fef3c7,stroke:#d97706
+    style StagWeb fill:#fde68a,stroke:#d97706,stroke-dasharray: 3 3
+    style StagAPI fill:#fde68a,stroke:#d97706,stroke-dasharray: 3 3
+    style StagDB fill:#fde68a,stroke:#d97706,stroke-dasharray: 3 3

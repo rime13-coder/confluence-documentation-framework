@@ -1,0 +1,72 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart TB
+    title["<b>Azure Infrastructure Resources</b><br/><i>Region: Canada Central | Subscription: CMMC Assessor Production</i>"]
+    style title fill:none,stroke:none
+
+    subgraph rg ["Resource Group: rg-cmmc-assessor-prod"]
+        direction TB
+
+        subgraph compute ["Compute — Container Apps"]
+            direction LR
+            CAE["<b>cae-cmmc-assessor-prod</b><br/><i>Container Apps Environment</i><br/>Consumption plan<br/>Scale-to-zero enabled"]
+            WebApp["<b>cmmc-web</b><br/><i>Container App</i><br/>Nginx + React SPA<br/>0.25 CPU / 0.5Gi<br/>0-3 replicas<br/>Concurrency: 100"]
+            APIApp["<b>cmmc-api</b><br/><i>Container App</i><br/>Node.js 20 Express<br/>0.5 CPU / 1Gi<br/>0-3 replicas<br/>Concurrency: 50"]
+        end
+
+        subgraph registry ["Container Registry"]
+            ACR["<b>acrcmmcassessorprod</b><br/><i>Azure Container Registry</i><br/>Basic SKU<br/>Images:<br/>cmmc-assessor-backend:sha/latest<br/>cmmc-assessor-frontend:sha/latest"]
+        end
+
+        subgraph database ["Database"]
+            PG["<b>psql-cmmc-assessor-prod</b><br/><i>PostgreSQL Flexible Server</i><br/>Version: 17 | SKU: B1ms<br/>1 vCore / 2GB RAM / 32GB<br/>TDE encryption<br/>7-day PITR backup<br/>SSL: Required"]
+        end
+
+        subgraph storage ["Storage"]
+            Blob["<b>stcmmcassessorprod</b><br/><i>Storage Account</i><br/>Standard_LRS<br/>Blob containers:<br/>evidence, exports, staging"]
+        end
+
+        subgraph security ["Security"]
+            KV["<b>kv-cmmc-assessor-prod</b><br/><i>Key Vault</i><br/>Standard tier<br/>Secrets: DB creds, JWT keys,<br/>MSAL secrets, AES-256 keys"]
+        end
+
+        subgraph monitoring ["Monitoring"]
+            LA["<b>log-cmmc-assessor-prod</b><br/><i>Log Analytics Workspace</i><br/>PerGB2018 pricing<br/>30-day retention<br/>KQL query support"]
+        end
+    end
+
+    subgraph domains ["Custom Domains — Azure Managed TLS"]
+        direction LR
+        FE_DNS["cmmc.intellisecops.com"]
+        BE_DNS["api.cmmc.intellisecops.com"]
+    end
+
+    subgraph tags ["Resource Tags"]
+        direction LR
+        Tag1["project: cmmc-assessor"]
+        Tag2["environment: production"]
+        Tag3["managedBy: bicep"]
+    end
+
+    CAE --- WebApp
+    CAE --- APIApp
+
+    FE_DNS -->|"TLS 1.2+"| WebApp
+    BE_DNS -->|"TLS 1.2+"| APIApp
+
+    APIApp -->|"Prisma ORM<br/>TCP + SSL"| PG
+    APIApp -->|"Storage SDK<br/>HTTPS"| Blob
+    APIApp -->|"Secret refs<br/>HTTPS"| KV
+    CAE -->|"Console logs<br/>stdout/stderr"| LA
+    ACR -->|"Image pull"| CAE
+
+    style rg fill:#e8f4fd,stroke:#2374ab,stroke-width:2px
+    style compute fill:#dbeafe,stroke:#2563eb
+    style registry fill:#fce7f3,stroke:#db2777
+    style database fill:#dcfce7,stroke:#16a34a
+    style storage fill:#fef3c7,stroke:#d97706
+    style security fill:#f3e8ff,stroke:#7c3aed
+    style monitoring fill:#f0fdf4,stroke:#22c55e
+    style domains fill:#f0f0f0,stroke:#888
+    style tags fill:#f5f5f5,stroke:#aaa
+    style WebApp fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style APIApp fill:#1168bd,color:#fff,stroke:#0e5aa7

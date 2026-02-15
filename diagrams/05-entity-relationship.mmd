@@ -1,0 +1,232 @@
+erDiagram
+    Tenant {
+        string id PK
+        string name
+        string domain
+        string entraIdTenantId UK
+        string sharepointSiteUrl
+        json settings
+        datetime createdAt
+    }
+
+    User {
+        string id PK
+        string email UK
+        string name
+        string passwordHash
+        string entraIdObjectId UK
+        enum platformRole "SUPER_ADMIN | SUPPORT | USER"
+        enum status "ACTIVE | INACTIVE"
+        datetime createdAt
+    }
+
+    TeamMember {
+        string id PK
+        string userId FK
+        string tenantId FK
+        enum role "OWNER | ADMIN | ASSESSOR | MEMBER | VIEWER"
+        datetime joinedAt
+    }
+
+    TenantInvitation {
+        string id PK
+        string tenantId FK
+        string email
+        enum role
+        string invitedBy FK
+        enum status "PENDING | ACCEPTED | EXPIRED"
+        datetime expiresAt
+    }
+
+    Invitation {
+        string id PK
+        string email
+        string organizationId FK
+        enum role
+        enum status
+    }
+
+    Organization {
+        string id PK
+        string name
+        string domain
+    }
+
+    Assessment {
+        string id PK
+        string tenantId FK
+        string name
+        string description
+        enum status "DRAFT | IN_PROGRESS | COMPLETE"
+        int level "1 | 2 | 3"
+        float score
+        datetime createdAt
+    }
+
+    Control {
+        string id PK
+        string controlId UK
+        string domain
+        string family
+        string title
+        string description
+        int level
+        float weight
+    }
+
+    AssessmentObjective {
+        string id PK
+        string assessmentId FK
+        string controlId FK
+        string objectiveId
+        string description
+        string tenantId FK
+    }
+
+    ObjectiveResponse {
+        string id PK
+        string objectiveId FK
+        enum response "MET | NOT_MET | NA"
+        string notes
+        string assessorId FK
+        string tenantId FK
+    }
+
+    ControlResponse {
+        string id PK
+        string assessmentId FK
+        string controlId FK
+        enum status
+        string notes
+        string tenantId FK
+    }
+
+    ControlImplementation {
+        string id PK
+        string assessmentId FK
+        string controlId FK
+        enum status
+        string description
+        string evidence
+        string tenantId FK
+    }
+
+    POAMItem {
+        string id PK
+        string tenantId FK
+        string controlId FK
+        string weakness
+        string milestone
+        date scheduledCompletionDate
+        enum status "OPEN | IN_PROGRESS | CLOSED"
+    }
+
+    POAMEvidence {
+        string id PK
+        string poamItemId FK
+        string fileName
+        string fileUrl
+    }
+
+    TenantPolicy {
+        string id PK
+        string tenantId FK
+        string title
+        string content
+        enum status "DRAFT | ACTIVE | ARCHIVED"
+        string category
+    }
+
+    PolicyVersion {
+        string id PK
+        string policyId FK
+        int version
+        string content
+        string changedBy FK
+        datetime createdAt
+    }
+
+    PolicyAcknowledgment {
+        string id PK
+        string policyVersionId FK
+        string userId FK
+        datetime acknowledgedAt
+    }
+
+    AuditLog {
+        string id PK
+        string tenantId FK
+        string entityType
+        string entityId
+        string action
+        string actorId FK
+        json changes
+        string ipAddress
+        datetime timestamp
+    }
+
+    SSPConfig {
+        string id PK
+        string tenantId FK
+        string organizationName
+        string systemName
+        json config
+    }
+
+    UserToken {
+        string id PK
+        string userId FK
+        string accessToken "AES-256-GCM encrypted"
+        string refreshToken "AES-256-GCM encrypted"
+        datetime expiresAt
+        string scope
+    }
+
+    RefreshToken {
+        string id PK
+        string userId FK
+        string token
+        string family
+        datetime expiresAt
+        boolean isRevoked
+    }
+
+    TokenDenyList {
+        string id PK
+        string token
+        datetime expiresAt
+        datetime revokedAt
+    }
+
+    Tenant ||--o{ TeamMember : "has members"
+    Tenant ||--o{ Assessment : "owns"
+    Tenant ||--o{ TenantInvitation : "sends"
+    Tenant ||--o{ TenantPolicy : "defines"
+    Tenant ||--o{ POAMItem : "tracks"
+    Tenant ||--o{ AuditLog : "records"
+    Tenant ||--o{ SSPConfig : "configures"
+
+    User ||--o{ TeamMember : "belongs to"
+    User ||--o{ ObjectiveResponse : "assesses"
+    User ||--o{ UserToken : "holds"
+    User ||--o{ RefreshToken : "has"
+    User ||--o{ PolicyAcknowledgment : "acknowledges"
+    User ||--o{ AuditLog : "triggers"
+
+    Assessment ||--o{ AssessmentObjective : "contains"
+    Assessment ||--o{ ControlResponse : "has"
+    Assessment ||--o{ ControlImplementation : "tracks"
+
+    Control ||--o{ AssessmentObjective : "defines"
+    Control ||--o{ ControlResponse : "evaluated in"
+    Control ||--o{ ControlImplementation : "implemented in"
+    Control ||--o{ POAMItem : "remediates"
+
+    AssessmentObjective ||--o{ ObjectiveResponse : "receives"
+
+    POAMItem ||--o{ POAMEvidence : "evidenced by"
+
+    TenantPolicy ||--o{ PolicyVersion : "versioned as"
+    PolicyVersion ||--o{ PolicyAcknowledgment : "acknowledged via"
+
+    Organization ||--o{ Invitation : "legacy"

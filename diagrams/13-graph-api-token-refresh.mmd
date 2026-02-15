@@ -1,0 +1,69 @@
+sequenceDiagram
+    title Graph API Token Refresh Flow — Evidence Management
+
+    actor User as Assessor
+    participant Web as cmmc-web<br/>(React SPA)
+    participant API as cmmc-api<br/>(Express API)
+    participant DB as PostgreSQL<br/>(UserToken table)
+    participant Entra as Microsoft<br/>Entra ID
+    participant Graph as Microsoft<br/>Graph API v1.0
+    participant SP as SharePoint<br/>Document Library
+
+    Note over User, SP: Happy Path — Token Valid
+
+    User->>Web: List evidence files
+    Web->>API: GET /api/evidence?tenantId=xyz<br/>Authorization: Bearer {JWT}
+    API->>DB: SELECT accessToken, refreshToken, expiresAt<br/>FROM UserToken WHERE userId = {uid}
+    DB-->>API: Encrypted tokens (AES-256-GCM)
+    API->>API: Decrypt tokens with AES key from Key Vault
+    API->>API: Check: token.expiresAt > now?
+
+    alt Token is valid
+        API->>Graph: GET /sites/{siteId}/drive/root/children<br/>Authorization: Bearer {graph_access_token}
+        Graph->>SP: Retrieve file listing
+        SP-->>Graph: File metadata
+        Graph-->>API: 200 OK — file list
+        API-->>Web: Evidence files list
+        Web-->>User: Display evidence files
+    end
+
+    Note over User, SP: Token Expired — Automatic Refresh
+
+    alt Token expired (expiresAt < now)
+        API->>Entra: POST /oauth2/v2.0/token<br/>grant_type=refresh_token<br/>refresh_token={encrypted_graph_refresh}<br/>(via MSAL 2.15)
+        Entra-->>API: New access_token + refresh_token (~1hr expiry)
+        API->>API: Encrypt new tokens (AES-256-GCM)
+        API->>DB: UPDATE UserToken SET accessToken, refreshToken, expiresAt
+        DB-->>API: Updated
+
+        API->>Graph: GET /sites/{siteId}/drive/root/children<br/>Authorization: Bearer {new_access_token}
+        Graph->>SP: Retrieve file listing
+        SP-->>Graph: File metadata
+        Graph-->>API: 200 OK — file list
+        API-->>Web: Evidence files list
+        Web-->>User: Display evidence files
+    end
+
+    Note over User, SP: Refresh Token Expired — Re-consent Required
+
+    alt Refresh token expired (90-day Microsoft default)
+        API->>Entra: POST /oauth2/v2.0/token (refresh_token)
+        Entra-->>API: 400 — invalid_grant
+        API->>DB: DELETE FROM UserToken WHERE userId = {uid}
+        API-->>Web: 401 — SharePoint re-authorization required
+        Web-->>User: Prompt: "Reconnect SharePoint"
+        User->>Web: Click "Reconnect SharePoint"
+        Web->>API: GET /api/auth/sharepoint-consent
+        API-->>Web: 302 Redirect to Entra ID<br/>scope: Sites.ReadWrite.All Files.ReadWrite.All
+        Web->>Entra: Consent prompt
+        User->>Entra: Grant SharePoint permissions
+        Entra-->>API: Authorization code
+        API->>Entra: Exchange code for Graph tokens (MSAL)
+        Entra-->>API: New access_token + refresh_token
+        API->>API: Encrypt tokens (AES-256-GCM)
+        API->>DB: INSERT UserToken (new encrypted tokens)
+        API-->>Web: 200 — SharePoint connected
+        Web-->>User: Resume evidence management
+    end
+
+    Note over API, Graph: Error Handling: 429 (Retry-After), 5xx (transient retry)

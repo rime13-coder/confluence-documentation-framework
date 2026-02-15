@@ -1,0 +1,30 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1a5a8a', 'lineColor': '#555', 'secondaryColor': '#e8f4fd', 'tertiaryColor': '#f0f0f0'}}}%%
+flowchart TB
+    subgraph boundary [" "]
+        direction TB
+        title["<b>System Context Diagram — CMMC Assessor Platform</b><br/><i>C4 Level 1</i>"]
+        style title fill:none,stroke:none
+
+        User["<b>Assessor / Compliance Officer</b><br/>Uses the platform to conduct<br/>CMMC assessments, manage POA&Ms,<br/>and generate SSP documents"]
+        Admin["<b>Tenant Admin</b><br/>Onboards organization,<br/>manages team members and policies"]
+
+        System["<b>CMMC Assessor Platform</b><br/><i>Multi-tenant SaaS Application</i><br/>Enables CMMC Level 1-3 assessments,<br/>SPRS scoring, evidence management,<br/>and compliance documentation"]
+
+        EntraID["<b>Microsoft Entra ID</b><br/><i>Identity Provider</i><br/>OAuth 2.0 / OIDC authentication,<br/>MFA enforcement"]
+        GraphAPI["<b>Microsoft Graph API</b><br/><i>External Service</i><br/>SharePoint evidence document<br/>storage and retrieval"]
+        GoDaddy["<b>GoDaddy DNS</b><br/><i>DNS Provider</i><br/>Public DNS resolution for<br/>custom domains"]
+    end
+
+    User -->|"Conducts assessments,<br/>scores controls, uploads evidence"| System
+    Admin -->|"Manages tenants,<br/>invites users, configures policies"| System
+    System -->|"Authenticates users via<br/>OAuth 2.0 / OIDC"| EntraID
+    System -->|"Manages evidence files<br/>on tenant SharePoint sites"| GraphAPI
+    GoDaddy -->|"Resolves CNAME records to<br/>Azure Container Apps"| System
+
+    style User fill:#08427b,color:#fff,stroke:#073a6b
+    style Admin fill:#08427b,color:#fff,stroke:#073a6b
+    style System fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style EntraID fill:#999,color:#fff,stroke:#777
+    style GraphAPI fill:#999,color:#fff,stroke:#777
+    style GoDaddy fill:#999,color:#fff,stroke:#777
+    style boundary fill:none,stroke:none

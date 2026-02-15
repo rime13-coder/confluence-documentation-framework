@@ -1,0 +1,66 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart TB
+    title["<b>Integration Landscape — CMMC Assessor Platform</b>"]
+    style title fill:none,stroke:none
+
+    subgraph platform ["CMMC Assessor Platform"]
+        direction TB
+        Web["<b>cmmc-web</b><br/>React 18.3 SPA"]
+        API["<b>cmmc-api</b><br/>Express 4.21 API"]
+    end
+
+    subgraph microsoft ["Microsoft Cloud Services"]
+        direction TB
+        EntraID["<b>Microsoft Entra ID</b><br/><i>Identity Provider</i><br/>OAuth 2.0 / OIDC<br/>SLA: 99.99%"]
+        GraphAPI["<b>Microsoft Graph API v1.0</b><br/><i>Evidence Management</i><br/>Rate: 10K req / 10min / tenant<br/>SLA: 99.9%"]
+        SharePoint["<b>SharePoint Online</b><br/><i>Document Storage</i><br/>Per-tenant site collections"]
+    end
+
+    subgraph azuresvcs ["Azure Platform Services"]
+        direction TB
+        KV["<b>Azure Key Vault</b><br/><i>Secrets Management</i><br/>HSM-backed, Standard tier"]
+        BlobSt["<b>Azure Blob Storage</b><br/><i>File Storage</i><br/>Standard_LRS"]
+        PgSQL[("<b>Azure PostgreSQL</b><br/><i>Flexible Server</i><br/>PostgreSQL 17, B1ms")]
+        LogAn["<b>Azure Log Analytics</b><br/><i>Observability</i><br/>30-day retention"]
+        ACR["<b>Azure Container Registry</b><br/><i>Image Storage</i><br/>Basic tier"]
+    end
+
+    subgraph cicd ["CI/CD"]
+        direction TB
+        GHA["<b>GitHub Actions</b><br/><i>CI/CD Pipelines</i><br/>OIDC federation to Azure"]
+    end
+
+    subgraph dns ["DNS"]
+        GoDaddy["<b>GoDaddy DNS</b><br/><i>Public DNS</i><br/>CNAME records"]
+    end
+
+    %% Browser to platform
+    Web -->|"HTTPS REST<br/>Bearer JWT<br/>Sync"| API
+
+    %% Authentication
+    API -->|"OAuth 2.0 / OIDC<br/>MSAL Confidential Client<br/>Sync"| EntraID
+
+    %% Graph API chain
+    API -->|"HTTPS REST<br/>Delegated Bearer Token<br/>Sync"| GraphAPI
+    GraphAPI -->|"Sites.ReadWrite.All<br/>Files.ReadWrite.All"| SharePoint
+
+    %% Azure services
+    API -->|"HTTPS<br/>Managed Identity<br/>Sync"| KV
+    API -->|"HTTPS REST<br/>Storage Key<br/>Sync"| BlobSt
+    API -->|"TCP + SSL<br/>Connection String<br/>Prisma ORM"| PgSQL
+    platform -->|"stdout/stderr<br/>Platform-managed<br/>Async"| LogAn
+
+    %% CI/CD
+    GHA -->|"OIDC Federation<br/>Build + Deploy"| ACR
+    GHA -->|"OIDC<br/>az containerapp deploy"| platform
+
+    %% DNS
+    GoDaddy -->|"CNAME resolution<br/>cmmc.intellisecops.com<br/>api.cmmc.intellisecops.com"| platform
+
+    style platform fill:#dbeafe,stroke:#2563eb,stroke-width:2px
+    style microsoft fill:#fce7f3,stroke:#db2777
+    style azuresvcs fill:#dcfce7,stroke:#16a34a
+    style cicd fill:#fef3c7,stroke:#d97706
+    style dns fill:#f0f0f0,stroke:#888
+    style Web fill:#1168bd,color:#fff,stroke:#0e5aa7
+    style API fill:#1168bd,color:#fff,stroke:#0e5aa7

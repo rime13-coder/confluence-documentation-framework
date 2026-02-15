@@ -1,0 +1,72 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#2374ab', 'primaryTextColor': '#fff', 'lineColor': '#555'}}}%%
+flowchart TB
+    title["<b>Backend Component Diagram — cmmc-api</b><br/><i>Node.js 20 / Express 4.21 / TypeScript 5.6</i>"]
+    style title fill:none,stroke:none
+
+    Client["<b>cmmc-web</b><br/><i>React SPA</i>"]
+
+    subgraph middleware ["Express Middleware Pipeline"]
+        direction LR
+        CORS["CORS"]
+        Helmet["Helmet<br/><i>Security Headers</i>"]
+        RateLimit["Rate Limiter<br/><i>100 req/15min/IP</i>"]
+        JWTAuth["JWT Verifier<br/><i>+ Deny List Check</i>"]
+        TenantIso["Tenant Isolation<br/><i>Prisma Middleware</i>"]
+        RoleAuth["RBAC Enforcer<br/><i>Platform + Team Roles</i>"]
+        Validator["Input Validator<br/><i>express-validator</i>"]
+        ErrHandler["Error Handler"]
+    end
+
+    subgraph routes ["API Route Controllers — 68+ REST Endpoints"]
+        direction TB
+        AuthRoutes["<b>Auth Routes</b><br/>/api/auth/*<br/>login, callback, consent,<br/>logout, refresh, register"]
+        TenantRoutes["<b>Tenant Routes</b><br/>/api/tenants/*<br/>CRUD, settings,<br/>team management"]
+        AssessRoutes["<b>Assessment Routes</b><br/>/api/assessments/*<br/>CRUD, objectives,<br/>responses, scoring"]
+        ControlRoutes["<b>Control Routes</b><br/>/api/controls/*<br/>CMMC controls,<br/>implementations"]
+        POAMRoutes["<b>POA&M Routes</b><br/>/api/poam/*<br/>Items, milestones,<br/>evidence"]
+        PolicyRoutes["<b>Policy Routes</b><br/>/api/policies/*<br/>CRUD, versions,<br/>acknowledgments"]
+        EvidenceRoutes["<b>Evidence Routes</b><br/>/api/evidence/*<br/>Upload, download,<br/>SharePoint sync"]
+        SSPRoutes["<b>SSP Routes</b><br/>/api/ssp/*<br/>Config, DOCX<br/>generation"]
+        AuditRoutes["<b>Audit Routes</b><br/>/api/audit/*<br/>Immutable log<br/>queries"]
+    end
+
+    subgraph services ["Service Layer"]
+        direction TB
+        AuthSvc["Auth Service<br/><i>MSAL + JWT</i>"]
+        AssessSvc["Assessment Service<br/><i>Scoring + Aggregation</i>"]
+        GraphSvc["Graph API Service<br/><i>SharePoint Files</i>"]
+        SSPSvc["SSP Generator<br/><i>docx 9.5</i>"]
+        AuditSvc["Audit Service<br/><i>Append-only Logging</i>"]
+    end
+
+    subgraph data ["Data Access Layer"]
+        direction LR
+        Prisma["<b>Prisma 5.22 ORM</b><br/><i>Typed queries + tenant scoping</i>"]
+    end
+
+    Client --> CORS
+    CORS --> Helmet --> RateLimit --> JWTAuth --> TenantIso --> RoleAuth --> Validator --> ErrHandler
+
+    ErrHandler --> routes
+
+    AuthRoutes --> AuthSvc
+    AssessRoutes --> AssessSvc
+    EvidenceRoutes --> GraphSvc
+    SSPRoutes --> SSPSvc
+    AuditRoutes --> AuditSvc
+
+    services --> Prisma
+
+    Prisma -->|"TCP + SSL"| DB[("PostgreSQL 17")]
+    GraphSvc -->|"HTTPS"| GraphAPI["Graph API"]
+    AuthSvc -->|"OAuth 2.0"| EntraID["Entra ID"]
+
+    style Client fill:#08427b,color:#fff,stroke:#073a6b
+    style middleware fill:#fef3c7,stroke:#d97706,stroke-width:1px
+    style routes fill:#e8f4fd,stroke:#2374ab,stroke-width:1px
+    style services fill:#dcfce7,stroke:#16a34a,stroke-width:1px
+    style data fill:#f3e8ff,stroke:#7c3aed,stroke-width:1px
+    style DB fill:#2e7d32,color:#fff,stroke:#256b28
+    style GraphAPI fill:#999,color:#fff,stroke:#777
+    style EntraID fill:#999,color:#fff,stroke:#777
+    style Prisma fill:#7c3aed,color:#fff,stroke:#6b21a8
