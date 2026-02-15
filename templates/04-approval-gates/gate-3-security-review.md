@@ -2,8 +2,8 @@
 
 | **Page Title**   | Gate 3 - Security Review - CMMC Assessor Platform  |
 |------------------|-----------------------------------------------------|
-| **Last Updated** | 2026-02-14                                          |
-| **Status**       | IN PROGRESS                                         |
+| **Last Updated** | 2026-02-15                                          |
+| **Status**       | IN PROGRESS — Phase 1 Critical RESOLVED; Phase 2 in progress |
 | **Owner**        | IntelliSec Solutions Security Lead                  |
 | **Gate Date**    | 2026-02-11                                          |
 
@@ -61,7 +61,7 @@ Gate 3 validates that the project's security posture is acceptable before deploy
 
 | Severity | Total Found | Mitigated | Accepted | Open | Target Resolution |
 |----------|-------------|-----------|----------|------|-------------------|
-| **Critical** | 4 | 0 | 0 | 4 | Phase 1: within 48 hours (by 2026-02-13) |
+| **Critical** | 4 | 4 | 0 | 0 | Phase 1: RESOLVED (2026-02-15) |
 | **High** | 10 | 0 | 0 | 10 | Phase 2: within 2 weeks (by 2026-02-25) |
 | **Medium** | 22 | 0 | 0 | 22 | Phase 3: 1-3 months (by 2026-05-11) |
 | **Low** | 11 | 0 | 0 | 11 | Phase 4: 3-6 months (by 2026-08-11) |
@@ -75,10 +75,10 @@ Gate 3 validates that the project's security posture is acceptable before deploy
 
 | Finding ID | Source | Severity | Finding Description | Component Affected | Status | Remediation / Justification | Owner | Target Date |
 |-----------|--------|----------|--------------------|--------------------|--------|----------------------------|-------|-------------|
-| F-01 | Manual Review | Critical | Open redirect in OAuth callback: redirect_uri not validated against an allowlist, allowing authorization code theft via redirect to attacker-controlled site | OAuth callback endpoint | Open | Validate redirect_uri against strict allowlist of registered URIs; reject unrecognized redirects | Dev Lead | 2026-02-13 |
-| F-02 | Manual Review | Critical | No .dockerignore file: Docker build context includes .env files, .git directory, node_modules, source code, and potentially secrets in the published container image | Dockerfile / CI/CD | Open | Create comprehensive .dockerignore excluding .env, .git, node_modules, src, tests, docs | DevOps Lead | 2026-02-13 |
-| F-03 | Manual Review | Critical | Open registration allows anyone to create an account without invitation or domain restriction; inappropriate for a platform handling sensitive CUI metadata | User registration endpoint | Open | Implement invitation-only or domain-restricted registration with admin approval workflow | Dev Lead | 2026-02-13 |
-| F-04 | Manual Review | Critical | No rate limiting on any of the 68+ API endpoints, including authentication; enables credential stuffing, brute force, and volumetric DoS attacks | All API endpoints | Open | Implement express-rate-limit with tiered limits (stricter on auth, moderate on API, lenient on read-only) | Dev Lead | 2026-02-13 |
+| F-01 | Manual Review | Critical | Open redirect in OAuth callback: redirect_uri not validated against an allowlist, allowing authorization code theft via redirect to attacker-controlled site | OAuth callback endpoint | **RESOLVED** | `validateRedirectUrl()` validates redirect parameter against allowlist of permitted origins | Dev Lead | 2026-02-15 |
+| F-02 | Manual Review | Critical | No .dockerignore file: Docker build context includes .env files, .git directory, node_modules, source code, and potentially secrets in the published container image | Dockerfile / CI/CD | **RESOLVED** | `.dockerignore` created excluding .env, .git, node_modules, src, tests, docs | DevOps Lead | 2026-02-15 |
+| F-03 | Manual Review | Critical | Open registration allows anyone to create an account without invitation or domain restriction; inappropriate for a platform handling sensitive CUI metadata | User registration endpoint | **RESOLVED** | Registration restricted to invitation-only with domain validation | Dev Lead | 2026-02-15 |
+| F-04 | Manual Review | Critical | No rate limiting on any of the 68+ API endpoints, including authentication; enables credential stuffing, brute force, and volumetric DoS attacks | All API endpoints | **RESOLVED** | express-rate-limit implemented with tiered limits on all endpoints | Dev Lead | 2026-02-15 |
 
 ### High Findings (Phase 2 -- within 2 weeks)
 

@@ -119,8 +119,8 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 | Tenant Configuration | SharePoint site URL, settings JSON | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (ADMIN+ for write) |
 | Entra ID Tenant ID | UUID | Internal | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | System use |
 | Graph API Access/Refresh Tokens | Encrypted token strings | Restricted | Yes (AES-256-GCM before DB storage + PostgreSQL TDE) | Yes (TLS 1.2+) | Full mask | System only (encrypted at application layer) |
-| JWT Signing Key | 256-bit secret | Restricted | Yes (Key Vault HSM-backed) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
-| AES-256 Encryption Key | 256-bit key | Restricted | Yes (Key Vault HSM-backed) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
+| JWT Signing Key | 256-bit secret | Restricted | Yes (Key Vault software-protected) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
+| AES-256 Encryption Key | 256-bit key | Restricted | Yes (Key Vault software-protected) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
 | Database Connection String | postgresql://user:pass@host/db | Restricted | Yes (Key Vault) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference |
 | MSAL Client Secret | Random string | Restricted | Yes (Key Vault) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference |
 | Audit Log Entries | Action, actor, timestamp, changes JSON | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No (audit trail by design) | RBAC (ADMIN+); append-only (no update/delete) |

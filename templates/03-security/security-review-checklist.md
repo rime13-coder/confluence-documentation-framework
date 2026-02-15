@@ -20,17 +20,17 @@ This checklist provides a comprehensive security review for the **CMMC Assessor 
 
 | Domain                        | Total Checks | Pass | Fail | N/A | Status       |
 |-------------------------------|-------------|------|------|-----|--------------|
-| Authentication & Authorization | 10          | 6    | 3    | 1   | IN PROGRESS  |
+| Authentication & Authorization | 10          | 7    | 2    | 1   | IN PROGRESS  |
 | Network Security               | 10          | 2    | 7    | 1   | IN PROGRESS  |
 | Data Protection                | 10          | 5    | 2    | 3   | IN PROGRESS  |
 | Secret Management              | 8           | 3    | 3    | 2   | IN PROGRESS  |
 | Dependency Security            | 7           | 2    | 3    | 2   | IN PROGRESS  |
 | Code Security                  | 7           | 4    | 2    | 1   | IN PROGRESS  |
-| Container Security             | 8           | 2    | 4    | 2   | IN PROGRESS  |
+| Container Security             | 8           | 3    | 3    | 2   | IN PROGRESS  |
 | Logging & Audit                | 10          | 4    | 4    | 2   | IN PROGRESS  |
 | Compliance                     | 10          | 3    | 2    | 5   | IN PROGRESS  |
 
-**Overall Result:** FAIL -- 47 findings identified, remediation in progress across 4 phases
+**Overall Result:** FAIL -- 47 findings identified; 4 Critical RESOLVED (2026-02-15); 43 remaining findings in remediation across Phases 2-4
 
 ---
 
@@ -47,7 +47,7 @@ This checklist provides a comprehensive security review for the **CMMC Assessor 
 | 3.7 | Token lifetime and refresh policies are configured per enterprise standards | PASS | JWT with refresh token rotation implemented; AES-256-GCM encryption for Graph API tokens | Security Lead | 2026-02-11 |
 | 3.8 | Conditional Access policies block access from non-compliant devices and risky sign-ins | N/A | Conditional Access managed at Entra ID tenant level by client organizations; platform defers to tenant policies | Security Lead | 2026-02-11 |
 | 3.9 | JWT tokens are not exposed in URLs, logs, or insecure channels | FAIL | F-05: JWT tokens passed via URL query parameters, risking exposure in browser history, referrer headers, and server logs | Security Lead | 2026-02-11 |
-| 3.10 | Rate limiting is implemented on authentication endpoints to prevent brute-force attacks | FAIL | F-04: No rate limiting on any API endpoints including authentication; critical vulnerability allowing credential stuffing and brute-force attacks | Security Lead | 2026-02-11 |
+| 3.10 | Rate limiting is implemented on authentication endpoints to prevent brute-force attacks | PASS | F-04 RESOLVED: express-rate-limit implemented with tiered limits on all API endpoints including authentication (2026-02-15) | Security Lead | 2026-02-15 |
 
 ---
 
@@ -141,7 +141,7 @@ This checklist provides a comprehensive security review for the **CMMC Assessor 
 | 9.5 | Read-only root filesystem is enforced where possible | FAIL | Read-only filesystem not configured on Container Apps; application may write to filesystem | Security Lead | 2026-02-11 |
 | 9.6 | Resource limits (CPU, memory) are defined for all containers | N/A | Azure Container Apps manages resource allocation; scaling rules to be configured | Security Lead | 2026-02-11 |
 | 9.7 | Network policies restrict container-to-container communication (if applicable) | N/A | Single container app deployment; no inter-container communication to restrict | Security Lead | 2026-02-11 |
-| 9.8 | .dockerignore is configured to exclude sensitive files from the build context | FAIL | F-02: No .dockerignore file exists; Docker build context includes .env files, .git directory, node_modules, source code, and potentially secrets | Security Lead | 2026-02-11 |
+| 9.8 | .dockerignore is configured to exclude sensitive files from the build context | PASS | F-02 RESOLVED: .dockerignore created excluding .env, .git, node_modules, src, tests, and documentation from Docker build context (2026-02-15) | Security Lead | 2026-02-15 |
 
 ---
 

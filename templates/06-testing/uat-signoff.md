@@ -209,7 +209,7 @@ The following issues are known from the security review and current state of the
 |------------------|-----------------------------------------------------------|-----------|-------------------------------------------------|--------------------|---------------|
 | KNOWN-001        | No staging environment for pre-production validation      | High      | Testing conducted directly in production with caution | TBD (staging provisioning) | TBD    |
 | KNOWN-002        | No automated test suites (unit, integration, E2E)         | High      | Manual testing + CI type checking and linting   | TBD                | TBD           |
-| KNOWN-003        | 47 security findings from 2026-02-11 review under remediation | Medium | Being actively remediated; tracked in GitHub Issues | Ongoing       | TBD           |
+| KNOWN-003        | 47 security findings from 2026-02-11 review; Phase 1 Critical (F-01–F-04) ALL RESOLVED 2026-02-15; Phase 2 High (F-05, F-09, F-10, F-12) in progress, deadline 2026-02-25 | Medium | Being actively remediated; tracked in GitHub Issues | Ongoing | TBD |
 | KNOWN-004        | No automated smoke tests post-deployment                  | Medium    | Manual verification after each deployment       | TBD                | TBD           |
 
 ### Risk Assessment for Known Issues

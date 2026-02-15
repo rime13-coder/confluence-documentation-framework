@@ -61,7 +61,7 @@ See security findings F-09, F-12.
 |---------------------------|-----------------|------------------|--------------------|------------------------------------|
 | N/A                       | N/A             | N/A              | N/A                | No VNet deployed                   |
 
-> **Current State:** There is no Virtual Network deployed. All services communicate over public endpoints. This is tracked as security finding F-09 and is planned for Phase 1 remediation.
+> **Current State:** There is no Virtual Network deployed. All services communicate over public endpoints. This is tracked as security finding F-09 and is in progress as part of Phase 2 remediation (deadline 2026-02-25).
 
 ### Planned VNet Design (Target State)
 
@@ -277,8 +277,8 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 | Finding ID | Description                                              | Severity | Status  |
 |------------|----------------------------------------------------------|----------|---------|
-| F-09       | No VNet deployed for network isolation                   | High     | Planned |
-| F-12       | PostgreSQL AllowAzureServices firewall rule (0.0.0.0)    | High     | Planned |
+| F-09       | No VNet deployed for network isolation                   | High     | In Progress (Phase 2, due 2026-02-25) |
+| F-12       | PostgreSQL AllowAzureServices firewall rule (0.0.0.0)    | High     | In Progress (Phase 2, due 2026-02-25) |
 | F-40       | CORS allows localhost in production                      | Medium   | Planned |
 
 ---

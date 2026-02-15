@@ -142,7 +142,7 @@ Gate 2 ensures the proposed architecture aligns with Azure best practices, is sc
 
 | # | Condition / Action Item | Priority (High / Medium / Low) | Owner | Target Date | Status |
 |---|------------------------|-------------------------------|-------|-------------|--------|
-| 1 | Evaluate and plan VNet integration with private endpoints for PostgreSQL, Key Vault, ACR (security posture 3.4.2) | High | DevOps Lead | 2026-02-11 (Gate 3) | IN PROGRESS |
+| 1 | Evaluate and plan VNet integration with private endpoints for PostgreSQL, Key Vault, ACR (security posture 3.4.2) | High | DevOps Lead | 2026-02-11 (Gate 3) | COMPLETE — Evaluated in Gate 3; implementation tracked as F-09 in Phase 2 remediation |
 | 2 | Integrate Key Vault references into Container Apps configuration; remove secrets from environment variables (security posture 3.4.4) | High | DevOps Lead | 2026-02-25 | IN PROGRESS |
 | 3 | Configure Azure Monitor alerting rules for critical application and infrastructure events (operational readiness 3.6.2) | Medium | DevOps Lead | 2026-02-25 | NOT STARTED |
 | 4 | Create operational runbooks for deployment, rollback, and incident response (operational readiness 3.6.6) | Medium | DevOps Lead | 2026-02-25 | NOT STARTED |

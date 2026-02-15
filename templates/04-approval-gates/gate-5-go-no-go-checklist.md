@@ -2,7 +2,7 @@
 
 | **Page Title**   | Gate 5 - Go / No-Go Checklist - CMMC Assessor Platform   |
 |------------------|-----------------------------------------------------------|
-| **Last Updated** | 2026-02-14                                                |
+| **Last Updated** | 2026-02-15                                                |
 | **Status**       | NOT STARTED                                               |
 | **Owner**        | DevOps Lead, IntelliSec Solutions                         |
 | **Gate Date**    | 2026-02-19 (planned, morning of deployment)               |
@@ -28,8 +28,8 @@ Gate 5 is the final checkpoint before the CMMC Assessor Platform's initial produ
 
 | # | Check | Status (Ready / Not Ready / N/A) | Owner | Notes |
 |---|-------|----------------------------------|-------|-------|
-| 2.1.1 | All pull requests for this release are merged to the main branch | Not Ready | Dev Lead | Pending Phase 1 Critical fixes merge |
-| 2.1.2 | Main branch is frozen (code freeze in effect) | Not Ready | Dev Lead | Code freeze after Phase 1 PRs merged |
+| 2.1.1 | All pull requests for this release are merged to the main branch | Not Ready | Dev Lead | Phase 1 Critical fixes merged (2026-02-15); Phase 2 PRs pending |
+| 2.1.2 | Main branch is frozen (code freeze in effect) | Not Ready | Dev Lead | Code freeze after Phase 2 PRs merged |
 | 2.1.3 | No critical or high-severity bugs are open against this release | Ready | Dev Lead | Phase 1 Critical findings (F-01, F-02, F-03, F-04) verified resolved 2026-02-15; 10 High findings in Phase 2 remediation |
 | 2.1.4 | All known issues included in the release are documented in release notes | Not Ready | Product Owner | Release notes to be drafted |
 | 2.1.5 | Version number / build tag is finalized | Not Ready | DevOps Lead | Version: 1.0.0 |
@@ -114,16 +114,16 @@ Gate 5 is the final checkpoint before the CMMC Assessor Platform's initial produ
 
 | Category | Total Checks | Ready | Not Ready | N/A |
 |----------|-------------|-------|-----------|-----|
-| Code | 7 | 0 | 7 | 0 |
+| Code | 7 | 1 | 6 | 0 |
 | Testing | 7 | 0 | 6 | 1 |
-| Security | 6 | 1 | 5 | 0 |
+| Security | 6 | 2 | 4 | 0 |
 | Infrastructure | 9 | 0 | 9 | 0 |
-| Operations | 7 | 0 | 5 | 2 |
+| Operations | 7 | 0 | 6 | 1 |
 | Communication | 6 | 0 | 6 | 0 |
 | Rollback | 7 | 0 | 6 | 1 |
-| **Total** | **49** | **1** | **44** | **4** |
+| **Total** | **49** | **3** | **43** | **3** |
 
-> **Note:** All items currently show "Not Ready" because this checklist is prepared in advance (2026-02-14) for the planned deployment on 2026-02-19. Items will be updated to "Ready" as prerequisites are completed in the days leading up to deployment.
+> **Note:** Most items show "Not Ready" because this checklist is prepared in advance for the planned deployment on 2026-02-19. Phase 1 Critical security fixes (F-01 through F-04) were resolved 2026-02-15. Items will be updated to "Ready" as remaining prerequisites are completed.
 
 ---
 

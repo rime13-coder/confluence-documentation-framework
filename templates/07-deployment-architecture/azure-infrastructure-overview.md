@@ -129,7 +129,7 @@ The project operates under a single subscription with a single resource group.
 ### Planned Improvements
 
 - Adopt Azure Landing Zone best practices as the project matures
-- Implement VNet integration as part of Phase 1 remediation (F-09)
+- Implement VNet integration as part of Phase 2 remediation (F-09, deadline 2026-02-25)
 
 ---
 
@@ -216,7 +216,7 @@ N/A -- Azure Blueprints are not used.
 |-----------------------|------------------------|----------------------|----------------------|
 | CMMC Level 2          | In Progress            | Continuous           | IntelliSec Solutions |
 
-> **Note:** The platform itself is a CMMC assessment tool. The platform's own compliance posture is being hardened through ongoing security remediation (tracked as security findings F-01 through F-43+).
+> **Note:** The platform itself is a CMMC assessment tool. The platform's own compliance posture is being hardened through ongoing security remediation. Phase 1 Critical findings (F-01 through F-04) were resolved 2026-02-15. Phase 2 High findings (F-05, F-09, F-10, F-12) are in progress with deadline 2026-02-25. Phases 3-4 cover the remaining 33 Medium/Low findings.
 
 ---
 

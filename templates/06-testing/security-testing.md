@@ -309,11 +309,11 @@ A security review conducted on 2026-02-11 identified **47 findings** across the 
 
 | Metric                              | Current Value    | Target          | Trend                     |
 |-------------------------------------|------------------|-----------------|---------------------------|
-| Total findings from security review | 47               | 0 Critical/High | Being remediated          |
-| Open Critical vulnerabilities       | TBD              | 0               | Under triage              |
-| Open High vulnerabilities           | TBD              | < 5             | Under triage              |
-| Mean time to remediate (Critical)   | TBD              | < 1 day         | New process               |
-| Mean time to remediate (High)       | TBD              | < 3 days        | New process               |
+| Total findings from security review | 47               | 0 Critical/High | Phase 1 Critical resolved; Phase 2 in progress |
+| Open Critical vulnerabilities       | 0                | 0               | All 4 resolved (2026-02-15) |
+| Open High vulnerabilities           | 10               | < 5             | Phase 2 in progress (deadline 2026-02-25) |
+| Mean time to remediate (Critical)   | 4 days           | < 1 day         | F-01–F-04 resolved 2026-02-15 (4 days from review) |
+| Mean time to remediate (High)       | TBD              | < 3 days        | Phase 2 in progress       |
 | Dependency vulnerabilities (total)  | Checked per PR   | 0 High+         | Enforced via npm audit    |
 
 ---
@@ -365,7 +365,7 @@ Given that the CMMC Assessor Platform handles sensitive cybersecurity maturity d
 
 | Milestone                                          | Target Date  | Priority |
 |----------------------------------------------------|--------------|----------|
-| Remediate critical/high findings from security review | Ongoing    | Critical |
+| Remediate critical/high findings from security review | Ongoing — Phase 1 Critical RESOLVED (2026-02-15); Phase 2 High deadline 2026-02-25 | Critical |
 | Implement container image scanning (Trivy)         | TBD          | High     |
 | Implement IaC scanning (PSRule/Checkov)            | TBD          | Medium   |
 | Set up DAST scanning (OWASP ZAP) on staging       | TBD          | High     |

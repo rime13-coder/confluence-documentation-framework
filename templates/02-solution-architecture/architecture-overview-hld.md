@@ -224,7 +224,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 | 3 | MVP budget constrains infrastructure to burstable/consumption SKUs | Database limited to B1ms (1 vCore, 2GB); Container Apps on consumption plan; no Redis cache or CDN |
 | 4 | Small development team (1-3 developers) | Favors monolithic architecture over microservices; limits operational complexity tolerance; single repository for backend and frontend |
 | 5 | SharePoint is the mandated evidence storage platform (client requirement) | Requires Microsoft Graph API integration with incremental consent; evidence management depends on SharePoint availability and permissions |
-| 6 | 47 security findings identified (4 Critical, 10 High) requiring remediation over 6 months | Architecture decisions must account for security hardening roadmap; some features deferred pending security fixes |
+| 6 | 47 security findings identified (4 Critical — resolved 2026-02-15, 10 High — Phase 2 in progress) requiring remediation over 6 months | Architecture decisions must account for security hardening roadmap; some features deferred pending security fixes |
 
 ---
 
