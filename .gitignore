@@ -1,6 +1,9 @@
 # Claude Code local settings
 .claude/
 
+# Confluence credentials (NEVER commit)
+scripts/config.yaml
+
 # OS files
 .DS_Store
 Thumbs.db

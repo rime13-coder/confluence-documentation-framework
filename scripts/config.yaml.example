@@ -1,0 +1,25 @@
+# =============================================================================
+# Confluence Import Configuration
+# =============================================================================
+#
+# SETUP:
+# 1. Copy this file:  cp config.yaml.example config.yaml
+# 2. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+# 3. Create an API token
+# 4. Fill in config.yaml with your values
+# 5. Run: python scripts/import_to_confluence.py --dry-run
+# 6. If dry run looks good: python scripts/import_to_confluence.py
+#
+# NOTE: config.yaml is in .gitignore — your credentials stay local.
+# =============================================================================
+
+confluence:
+  base_url: "https://YOUR_DOMAIN.atlassian.net"
+  email: "your-email@company.com"
+  api_token: "YOUR_API_TOKEN"
+
+space:
+  key: "YOUR_SPACE_KEY"
+
+project:
+  name: "My Project Name"
