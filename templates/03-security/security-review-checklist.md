@@ -3,7 +3,7 @@
 | **Page Title**   | Security Review Checklist - CMMC Assessor Platform  |
 |------------------|-----------------------------------------------------|
 | **Last Updated** | 2026-02-15                                          |
-| **Status**       | IN PROGRESS — Phase 1 overdue; Phase 2 in progress   |
+| **Status**       | IN PROGRESS — Phase 1 RESOLVED; Phase 2 in progress   |
 | **Owner**        | IntelliSec Solutions Security Lead                  |
 | **Reviewers**    | Dev Lead, DevOps Lead, CTO                          |
 | **Environment**  | Azure (IntelliSec Production Subscription)          |
@@ -187,14 +187,14 @@ Items that received a **FAIL** status are tracked here with a remediation plan o
 
 ### Phase 1 -- Critical (within 48 hours of 2026-02-11)
 
-> **⚠ OVERDUE** — Phase 1 target date was 2026-02-13. As of 2026-02-15, these 4 critical items are 2 days past deadline. Escalation to CTO required.
+> **✅ RESOLVED** — All 4 Phase 1 Critical findings were remediated. Originally due 2026-02-13; resolved as of 2026-02-15.
 
 | Item # | Domain | Finding ID | Finding Description | Severity | Remediation Plan | Owner | Target Date | Status |
 |--------|--------|-----------|---------------------|----------|-----------------|-------|-------------|--------|
-| 1 | Auth | F-01 | Open redirect in OAuth callback allowing authorization code theft | Critical | Validate redirect_uri against strict allowlist | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
-| 2 | Container | F-02 | No .dockerignore; sensitive files included in Docker image | Critical | Create .dockerignore excluding .env, .git, node_modules, src, tests | DevOps Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
-| 3 | Auth | F-03 | Open registration allows anyone to create accounts | Critical | Implement invitation-only or domain-restricted registration | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
-| 4 | Auth | F-04 | No rate limiting on any API endpoints | Critical | Implement express-rate-limit with tiered limits | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| 1 | Auth | F-01 | Open redirect in OAuth callback allowing authorization code theft | Critical | Validate redirect_uri against strict allowlist | Dev Lead | 2026-02-13 | **RESOLVED** — `validateRedirectUrl()` validates redirect parameter against allowlist of permitted origins |
+| 2 | Container | F-02 | No .dockerignore; sensitive files included in Docker image | Critical | Create .dockerignore excluding .env, .git, node_modules, src, tests | DevOps Lead | 2026-02-13 | **RESOLVED** — `.dockerignore` created excluding sensitive files from build context |
+| 3 | Auth | F-03 | Open registration allows anyone to create accounts | Critical | Implement invitation-only or domain-restricted registration | Dev Lead | 2026-02-13 | **RESOLVED** — Registration restricted to invitation-only with domain validation |
+| 4 | Auth | F-04 | No rate limiting on any API endpoints | Critical | Implement express-rate-limit with tiered limits | Dev Lead | 2026-02-13 | **RESOLVED** — Rate limiting implemented with tiered limits on all endpoints |
 
 ### Phase 2 -- High (within 2 weeks of 2026-02-11)
 

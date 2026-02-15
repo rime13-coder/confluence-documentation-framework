@@ -30,7 +30,7 @@ Gate 5 is the final checkpoint before the CMMC Assessor Platform's initial produ
 |---|-------|----------------------------------|-------|-------|
 | 2.1.1 | All pull requests for this release are merged to the main branch | Not Ready | Dev Lead | Pending Phase 1 Critical fixes merge |
 | 2.1.2 | Main branch is frozen (code freeze in effect) | Not Ready | Dev Lead | Code freeze after Phase 1 PRs merged |
-| 2.1.3 | No critical or high-severity bugs are open against this release | Not Ready | Dev Lead | Phase 1 Critical findings (F-01, F-02, F-03, F-04) must be verified resolved |
+| 2.1.3 | No critical or high-severity bugs are open against this release | Ready | Dev Lead | Phase 1 Critical findings (F-01, F-02, F-03, F-04) verified resolved 2026-02-15; 10 High findings in Phase 2 remediation |
 | 2.1.4 | All known issues included in the release are documented in release notes | Not Ready | Product Owner | Release notes to be drafted |
 | 2.1.5 | Version number / build tag is finalized | Not Ready | DevOps Lead | Version: 1.0.0 |
 | 2.1.6 | Release artifact (Docker image) is built and stored in ACR | Not Ready | DevOps Lead | Image to be built from frozen main branch |
@@ -53,7 +53,7 @@ Gate 5 is the final checkpoint before the CMMC Assessor Platform's initial produ
 | # | Check | Status (Ready / Not Ready / N/A) | Owner | Notes |
 |---|-------|----------------------------------|-------|-------|
 | 2.3.1 | Gate 3 (Security Review) has been passed | Ready | Security Lead | Gate 3 approved with conditions on 2026-02-11 |
-| 2.3.2 | All Critical severity security findings are resolved (F-01, F-02, F-03, F-04) | Not Ready | Dev Lead | Phase 1 remediation in progress; target 2026-02-13 |
+| 2.3.2 | All Critical severity security findings are resolved (F-01, F-02, F-03, F-04) | Ready | Dev Lead | All 4 Critical findings resolved 2026-02-15 |
 | 2.3.3 | All High severity findings are resolved or formally accepted by CTO | Not Ready | CTO | 10 High findings open; CTO risk acceptance pending for any unresolved at deployment time |
 | 2.3.4 | SAST scan (CodeQL) on main branch shows no new critical/high findings | Not Ready | DevOps Lead | Run after Phase 1 fixes merged |
 | 2.3.5 | Dependency scan (npm audit) shows no critical vulnerabilities | Not Ready | DevOps Lead | Run after code freeze |

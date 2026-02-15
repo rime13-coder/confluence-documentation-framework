@@ -145,16 +145,16 @@ function buildDashboardHtml() {
 <td style="text-align: center;"><strong>MVP Development</strong><br/>Security Remediation</td>
 <td style="text-align: center;">
 <ac:structured-macro ac:name="status">
-<ac:parameter ac:name="title">AT RISK</ac:parameter>
-<ac:parameter ac:name="colour">Yellow</ac:parameter>
+<ac:parameter ac:name="title">ON TRACK</ac:parameter>
+<ac:parameter ac:name="colour">Green</ac:parameter>
 </ac:structured-macro>
-<br/>Phase 1 critical items overdue</td>
+<br/>Phase 1 resolved; Phase 2 in progress</td>
 <td style="text-align: center;">
 <ac:structured-macro ac:name="status">
-<ac:parameter ac:name="title">47 FINDINGS</ac:parameter>
-<ac:parameter ac:name="colour">Red</ac:parameter>
+<ac:parameter ac:name="title">43 REMAINING</ac:parameter>
+<ac:parameter ac:name="colour">Yellow</ac:parameter>
 </ac:structured-macro>
-<br/>4 Critical, 10 High</td>
+<br/>4 Critical resolved; 10 High in progress</td>
 <td style="text-align: center;"><strong>Phase 2 Deadline</strong><br/>2026-02-25<br/><em>VNet + Key Vault</em></td>
 </tr>
 </tbody>
@@ -180,7 +180,7 @@ function buildDashboardHtml() {
 <td><strong>Authentication (Entra ID SSO)</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DONE</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 <td>90%</td>
-<td>OAuth 2.0/OIDC + PKCE, admin consent, token refresh. Pending: redirect URI validation (F-01)</td>
+<td>OAuth 2.0/OIDC + PKCE, admin consent, token refresh. Redirect URI validation implemented (F-01 resolved)</td>
 </tr>
 <tr>
 <td><strong>Assessment Workflows</strong></td>
@@ -266,16 +266,16 @@ function buildDashboardHtml() {
 </tbody>
 </table>
 
-<ac:structured-macro ac:name="warning">
+<ac:structured-macro ac:name="info">
 <ac:rich-text-body>
-<p><strong>Phase 1 Critical Items OVERDUE</strong> (deadline was 2026-02-13)</p>
+<p><strong>Phase 1 Critical Items — ALL RESOLVED</strong> (completed 2026-02-15)</p>
 <ul>
-<li>F-01: Open redirect in OAuth callback — IN PROGRESS</li>
-<li>F-02: No .dockerignore — IN PROGRESS</li>
-<li>F-03: Open registration — IN PROGRESS</li>
-<li>F-04: No rate limiting — IN PROGRESS</li>
+<li>F-01: Open redirect in OAuth callback — RESOLVED (validateRedirectUrl allowlist)</li>
+<li>F-02: No .dockerignore — RESOLVED (.dockerignore created)</li>
+<li>F-03: Open registration — RESOLVED (invitation-only registration)</li>
+<li>F-04: No rate limiting — RESOLVED (express-rate-limit implemented)</li>
 </ul>
-<p>Escalation to CTO required per remediation policy.</p>
+<p>Phase 2 (High severity) in progress — deadline 2026-02-25.</p>
 </ac:rich-text-body>
 </ac:structured-macro>
 
@@ -299,14 +299,14 @@ function buildDashboardHtml() {
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">CRITICAL</ac:parameter><ac:parameter ac:name="colour">Red</ac:parameter></ac:structured-macro></td>
 <td>4 findings (F-01, F-02, F-03, F-04)</td>
 <td>2026-02-13</td>
-<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">OVERDUE</ac:parameter><ac:parameter ac:name="colour">Red</ac:parameter></ac:structured-macro></td>
+<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">RESOLVED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 </tr>
 <tr>
 <td><strong>Phase 2</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">HIGH</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td>
 <td>4 findings (F-05, F-09, F-10, F-12)</td>
 <td>2026-02-25</td>
-<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">NOT STARTED</ac:parameter><ac:parameter ac:name="colour">Grey</ac:parameter></ac:structured-macro></td>
+<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">IN PROGRESS</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td>
 </tr>
 <tr>
 <td><strong>Phase 3</strong></td>
@@ -421,7 +421,7 @@ function buildDashboardHtml() {
 <td><strong>Gate 3</strong></td>
 <td>Security Review</td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">BLOCKED</ac:parameter><ac:parameter ac:name="colour">Red</ac:parameter></ac:structured-macro></td>
-<td>47 findings; 4 Critical overdue; conditional FAIL</td>
+<td>4 Critical resolved; 10 High in progress (Phase 2); conditional FAIL pending Phase 2</td>
 </tr>
 <tr>
 <td><strong>Gate 4</strong></td>

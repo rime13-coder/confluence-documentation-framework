@@ -131,7 +131,7 @@ Gate 3 validates that the project's security posture is acceptable before deploy
 
 | # | Exit Criterion | Status (COMPLETE / NOT COMPLETE) | Evidence / Link | Owner |
 |---|---------------|----------------------------------|-----------------|-------|
-| 6.1 | Zero open Critical severity findings | NOT COMPLETE | 4 Critical findings open (F-01, F-02, F-03, F-04); remediation in progress -- Phase 1 target 2026-02-13 | Dev Lead |
+| 6.1 | Zero open Critical severity findings | COMPLETE | 4 Critical findings (F-01, F-02, F-03, F-04) all resolved as of 2026-02-15 | Dev Lead |
 | 6.2 | Zero open High severity findings (or formally accepted by CTO) | NOT COMPLETE | 10 High findings open; Phase 2 remediation plan in place; CTO risk acceptance pending for any that remain open at deployment | CTO |
 | 6.3 | All Medium findings have a remediation plan with target dates | COMPLETE | 22 Medium findings with Phase 3 remediation plan (1-3 months); all tracked in security-review-checklist.md | Security Lead |
 | 6.4 | Threat model is reviewed and approved by security team | COMPLETE | STRIDE threat model with 23 threats, mitigations, and residual risks documented | Security Lead |

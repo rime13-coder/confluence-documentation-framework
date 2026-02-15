@@ -185,7 +185,7 @@ Rollback will be initiated if **any** of the following conditions are met during
 
 | # | Condition | Owner | Must Be Met By | Status |
 |---|-----------|-------|---------------|--------|
-| 1 | All 4 Critical findings (F-01, F-02, F-03, F-04) must be verified as resolved and merged to main branch | Dev Lead | 2026-02-18 | IN PROGRESS |
+| 1 | All 4 Critical findings (F-01, F-02, F-03, F-04) must be verified as resolved and merged to main branch | Dev Lead | 2026-02-18 | COMPLETE — All 4 resolved 2026-02-15 |
 | 2 | Production Entra ID app registration must be created and tested | DevOps Lead | 2026-02-18 | NOT STARTED |
 | 3 | Production Bicep parameters file must be reviewed and approved | CTO | 2026-02-18 | NOT STARTED |
 | 4 | CTO must sign risk acceptance for any remaining open High findings | CTO | 2026-02-18 | NOT STARTED |
