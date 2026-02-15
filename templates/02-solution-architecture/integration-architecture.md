@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
 | Page Title       | CMMC Assessor Platform - Integration Architecture |
-| Last Updated     | 2026-02-14                                     |
+| Last Updated     | 2026-02-15                                     |
 | Status           | `DRAFT`                                        |
 | Owner            | Solution Architect                             |
 | Reviewers        | Technical Lead, Security Architect, Engineering Manager |
@@ -20,9 +20,9 @@ This document defines the integration architecture for the **CMMC Assessor Platf
 
 ## 2. Integration Landscape Diagram
 
-<!-- Insert integration landscape / context diagram here using draw.io/Lucidchart -->
+<!-- Diagrams embedded on Confluence page: 07-integration-landscape.png, 04-auth-login-sequence.png, 13-graph-api-token-refresh.png -->
 <!--
-    Show:
+    Shows:
     - cmmc-web (Browser SPA) -> cmmc-api (HTTPS REST, JWT auth)
     - cmmc-web (Browser) -> Microsoft Entra ID (OAuth redirect)
     - cmmc-api -> Microsoft Entra ID (HTTPS, MSAL token exchange)

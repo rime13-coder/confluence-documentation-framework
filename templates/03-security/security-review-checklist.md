@@ -2,8 +2,8 @@
 
 | **Page Title**   | Security Review Checklist - CMMC Assessor Platform  |
 |------------------|-----------------------------------------------------|
-| **Last Updated** | 2026-02-14                                          |
-| **Status**       | IN PROGRESS                                         |
+| **Last Updated** | 2026-02-15                                          |
+| **Status**       | IN PROGRESS — Phase 1 overdue; Phase 2 in progress   |
 | **Owner**        | IntelliSec Solutions Security Lead                  |
 | **Reviewers**    | Dev Lead, DevOps Lead, CTO                          |
 | **Environment**  | Azure (IntelliSec Production Subscription)          |
@@ -21,7 +21,7 @@ This checklist provides a comprehensive security review for the **CMMC Assessor 
 | Domain                        | Total Checks | Pass | Fail | N/A | Status       |
 |-------------------------------|-------------|------|------|-----|--------------|
 | Authentication & Authorization | 10          | 6    | 3    | 1   | IN PROGRESS  |
-| Network Security               | 10          | 1    | 8    | 1   | IN PROGRESS  |
+| Network Security               | 10          | 2    | 7    | 1   | IN PROGRESS  |
 | Data Protection                | 10          | 5    | 2    | 3   | IN PROGRESS  |
 | Secret Management              | 8           | 3    | 3    | 2   | IN PROGRESS  |
 | Dependency Security            | 7           | 2    | 3    | 2   | IN PROGRESS  |
@@ -62,7 +62,7 @@ This checklist provides a comprehensive security review for the **CMMC Assessor 
 | 4.5 | Azure DDoS Protection Standard is enabled for public-facing resources | N/A | No VNet deployed; DDoS Protection Standard requires a VNet; basic DDoS provided by Azure platform | Security Lead | 2026-02-11 |
 | 4.6 | No public IP addresses are assigned to backend resources (app servers, databases) | FAIL | F-12: PostgreSQL Flexible Server has AllowAzureServices firewall rule enabling access from any Azure service; effectively publicly accessible within Azure | Security Lead | 2026-02-11 |
 | 4.7 | DNS resolution uses Azure Private DNS Zones for internal services | FAIL | No private DNS zones; all services use public DNS resolution | Security Lead | 2026-02-11 |
-| 4.8 | Network traffic flow is documented and matches the approved architecture diagram | FAIL | Network topology not formally documented; no approved architecture diagram for network flows | Security Lead | 2026-02-11 |
+| 4.8 | Network traffic flow is documented and matches the approved architecture diagram | PASS | Network architecture diagram (Current vs Target) created and embedded on Confluence Networking & Security page; data flow and integration landscape diagrams also available | Security Lead | 2026-02-15 |
 | 4.9 | Cross-region / cross-VNET traffic is restricted and justified | FAIL | No VNet exists; all traffic is internet-routed; no network segmentation | Security Lead | 2026-02-11 |
 | 4.10 | Service endpoints or private endpoints are used instead of public access for storage and databases | FAIL | No service endpoints or private endpoints configured; all Azure PaaS services accessed over public internet | Security Lead | 2026-02-11 |
 
@@ -187,12 +187,14 @@ Items that received a **FAIL** status are tracked here with a remediation plan o
 
 ### Phase 1 -- Critical (within 48 hours of 2026-02-11)
 
+> **⚠ OVERDUE** — Phase 1 target date was 2026-02-13. As of 2026-02-15, these 4 critical items are 2 days past deadline. Escalation to CTO required.
+
 | Item # | Domain | Finding ID | Finding Description | Severity | Remediation Plan | Owner | Target Date | Status |
 |--------|--------|-----------|---------------------|----------|-----------------|-------|-------------|--------|
-| 1 | Auth | F-01 | Open redirect in OAuth callback allowing authorization code theft | Critical | Validate redirect_uri against strict allowlist | Dev Lead | 2026-02-13 | IN PROGRESS |
-| 2 | Container | F-02 | No .dockerignore; sensitive files included in Docker image | Critical | Create .dockerignore excluding .env, .git, node_modules, src, tests | DevOps Lead | 2026-02-13 | IN PROGRESS |
-| 3 | Auth | F-03 | Open registration allows anyone to create accounts | Critical | Implement invitation-only or domain-restricted registration | Dev Lead | 2026-02-13 | IN PROGRESS |
-| 4 | Auth | F-04 | No rate limiting on any API endpoints | Critical | Implement express-rate-limit with tiered limits | Dev Lead | 2026-02-13 | IN PROGRESS |
+| 1 | Auth | F-01 | Open redirect in OAuth callback allowing authorization code theft | Critical | Validate redirect_uri against strict allowlist | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| 2 | Container | F-02 | No .dockerignore; sensitive files included in Docker image | Critical | Create .dockerignore excluding .env, .git, node_modules, src, tests | DevOps Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| 3 | Auth | F-03 | Open registration allows anyone to create accounts | Critical | Implement invitation-only or domain-restricted registration | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| 4 | Auth | F-04 | No rate limiting on any API endpoints | Critical | Implement express-rate-limit with tiered limits | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
 
 ### Phase 2 -- High (within 2 weeks of 2026-02-11)
 

@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
 | Page Title       | CMMC Assessor Platform - Data Architecture     |
-| Last Updated     | 2026-02-14                                     |
+| Last Updated     | 2026-02-15                                     |
 | Status           | `DRAFT`                                        |
 | Owner            | Solution Architect                             |
 | Reviewers        | Technical Lead, Security Architect, Engineering Manager |
@@ -32,18 +32,7 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 
 ## 3. Data Flow Diagram
 
-<!-- Insert data flow diagram here using draw.io/Lucidchart -->
-<!--
-    Show:
-    - Browser (cmmc-web SPA) -> cmmc-api (HTTPS REST)
-    - cmmc-api -> PostgreSQL (Prisma ORM, TCP)
-    - cmmc-api -> Microsoft Entra ID (OAuth 2.0, HTTPS)
-    - cmmc-api -> Microsoft Graph API (SharePoint, HTTPS)
-    - cmmc-api -> Azure Blob Storage (HTTPS)
-    - cmmc-api -> Azure Key Vault (HTTPS, startup)
-    - Container Apps -> Log Analytics (system logs)
-    - GitHub Actions -> Azure Container Registry -> Container Apps (CI/CD)
--->
+<!-- Diagram: 06-data-flow.png — embedded on Confluence page as attachment -->
 
 ### 3.1 Data Flow Summary
 
@@ -63,9 +52,9 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 
 ## 4. Data Model / Entity-Relationship Diagram
 
-<!-- Insert ERD here using draw.io/Lucidchart/dbdiagram.io -->
+<!-- Diagram: 05-entity-relationship.png — embedded on Confluence page as attachment -->
 <!--
-    Show all 22 Prisma models with relationships:
+    Shows all 22 Prisma models with relationships:
     Tenant (root) -> TeamMember, Assessment, TenantPolicy, AuditLog, SSPConfig, TenantInvitation
     User -> TeamMember, ObjectiveResponse, PolicyAcknowledgment, UserToken, RefreshToken, AuditLog
     Assessment -> AssessmentObjective, ControlResponse, ControlImplementation, POAMItem

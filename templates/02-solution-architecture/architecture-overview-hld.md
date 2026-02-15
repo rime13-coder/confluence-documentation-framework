@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
 | Page Title       | CMMC Assessor Platform - Architecture Overview (HLD) |
-| Last Updated     | 2026-02-14                                     |
+| Last Updated     | 2026-02-15                                     |
 | Status           | `DRAFT`                                        |
 | Owner            | Solution Architect                             |
 | Reviewers        | Technical Lead, Security Architect, Engineering Manager |
@@ -39,14 +39,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 
 ## 4. System Context Diagram (C4 Level 1)
 
-<!-- Insert diagram here using draw.io/Lucidchart -->
-<!--
-    C4 Level 1 - System Context Diagram
-    Show:
-    - CMMC Assessor Platform as the central system
-    - User personas (Assessors, Team Members, Platform Admins)
-    - External systems (Microsoft Entra ID, Microsoft Graph API / SharePoint, GoDaddy DNS)
--->
+<!-- Diagram: 01-system-context.png — embedded on Confluence page as attachment -->
 
 | Actor / External System | Description | Interaction |
 |--------------------------|-------------|-------------|
@@ -61,10 +54,10 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 
 ## 5. Container Diagram (C4 Level 2)
 
-<!-- Insert diagram here using draw.io/Lucidchart -->
+<!-- Diagram: 02-container-diagram.png — embedded on Confluence page as attachment -->
 <!--
     C4 Level 2 - Container Diagram
-    Show:
+    Shows:
     - React SPA (frontend container)
     - Node.js/Express API (backend container)
     - PostgreSQL database

@@ -2,8 +2,8 @@
 
 | **Page Title**   | Threat Model - CMMC Assessor Platform             |
 |------------------|----------------------------------------------------|
-| **Last Updated** | 2026-02-14                                         |
-| **Status**       | IN PROGRESS                                        |
+| **Last Updated** | 2026-02-15                                         |
+| **Status**       | IN PROGRESS — Phase 1 overdue; Phase 2 in progress  |
 | **Owner**        | IntelliSec Solutions Security Lead                 |
 | **Reviewers**    | Platform Architect, DevOps Lead, CTO               |
 | **Methodology**  | STRIDE                                             |
@@ -130,9 +130,9 @@ CI/CD:
 +----------------+               +-------------------+
 ```
 
-**DFD Link:** To be created in draw.io
+**DFD Link:** Architecture diagrams (System Context, Container, Data Flow, Integration Landscape) are now embedded on the corresponding Confluence pages — see Architecture Overview (HLD), Data Architecture, and Integration Architecture pages.
 
-**Tool Used:** Text-based diagram (formal DFD to be created in draw.io or Microsoft Threat Modeling Tool)
+**Tool Used:** Mermaid CLI (rendered to PNG and embedded as Confluence page attachments)
 
 ---
 
@@ -195,12 +195,14 @@ CI/CD:
 
 ### 7.1 Critical Priority (Phase 1 -- within 48 hours of 2026-02-11)
 
+> **⚠ OVERDUE** — Phase 1 target date was 2026-02-13. As of 2026-02-15, these items are 2 days past the original deadline. Escalation to CTO required per remediation policy.
+
 | Mitigation ID | Threat(s) Addressed | Mitigation Description | Owner | Target Date | Status |
 |---------------|----------------------|------------------------|-------|-------------|--------|
-| M-001 | T-001 | Fix open redirect in OAuth callback: validate redirect_uri against strict allowlist of registered URIs | Dev Lead | 2026-02-13 | IN PROGRESS |
-| M-002 | T-006, T-010 | Create comprehensive .dockerignore to exclude .env, .git, node_modules, src, tests, and documentation from Docker builds | DevOps Lead | 2026-02-13 | IN PROGRESS |
-| M-003 | T-002, T-021 | Restrict open registration: implement invitation-only or domain-restricted sign-up with admin approval | Dev Lead | 2026-02-13 | IN PROGRESS |
-| M-004 | T-003, T-016 | Implement rate limiting using express-rate-limit on all API endpoints with tiered limits (stricter on auth endpoints) | Dev Lead | 2026-02-13 | IN PROGRESS |
+| M-001 | T-001 | Fix open redirect in OAuth callback: validate redirect_uri against strict allowlist of registered URIs | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| M-002 | T-006, T-010 | Create comprehensive .dockerignore to exclude .env, .git, node_modules, src, tests, and documentation from Docker builds | DevOps Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| M-003 | T-002, T-021 | Restrict open registration: implement invitation-only or domain-restricted sign-up with admin approval | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
+| M-004 | T-003, T-016 | Implement rate limiting using express-rate-limit on all API endpoints with tiered limits (stricter on auth endpoints) | Dev Lead | 2026-02-13 | **OVERDUE** — IN PROGRESS |
 
 ### 7.2 High Priority (Phase 2 -- within 2 weeks of 2026-02-11)
 

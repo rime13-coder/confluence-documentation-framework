@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
 | Page Title       | CMMC Assessor Platform - Low-Level Design (LLD) |
-| Last Updated     | 2026-02-14                                     |
+| Last Updated     | 2026-02-15                                     |
 | Status           | `DRAFT`                                        |
 | Owner            | Solution Architect                             |
 | Reviewers        | Technical Lead, Security Architect, Engineering Manager |
@@ -20,7 +20,7 @@ This document provides the detailed low-level design for the **CMMC Assessor Pla
 
 ## 2. Component Diagram (C4 Level 3)
 
-<!-- Insert diagram here using draw.io/Lucidchart -->
+<!-- Diagram: 03-backend-components.png — embedded on Confluence page as attachment -->
 <!--
     C4 Level 3 - Component Diagram
     Backend (cmmc-api) internals:
@@ -181,8 +181,8 @@ This document provides the detailed low-level design for the **CMMC Assessor Pla
 
 ### 5.2 Entity Relationship Overview (22 Tables)
 
-<!-- Insert ERD diagram here using draw.io/Lucidchart/dbdiagram.io -->
-<!-- Show all 22 Prisma models with relationships -->
+<!-- Diagram: 05-entity-relationship.png — embedded on Confluence Data Architecture page as attachment -->
+<!-- Shows all 22 Prisma models with relationships -->
 
 #### Core Tenant and User Tables
 
