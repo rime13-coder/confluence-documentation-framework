@@ -1,23 +1,23 @@
 # Gate 4 - Change Advisory Board (CAB)
 
-| **Page Title**   | Gate 4 - Change Advisory Board - [PROJECT_NAME]  |
-|------------------|---------------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                                      |
-| **Status**       | NOT STARTED / IN PROGRESS / COMPLETE              |
-| **Owner**        | [CHANGE_MANAGER_NAME]                             |
-| **Gate Date**    | [YYYY-MM-DD]                                      |
-| **Change ID**    | [CHG-XXXX]                                        |
+| **Page Title**   | Gate 4 - Change Advisory Board - CMMC Assessor Platform   |
+|------------------|-----------------------------------------------------------|
+| **Last Updated** | 2026-02-14                                                |
+| **Status**       | IN PROGRESS                                               |
+| **Owner**        | DevOps Lead, IntelliSec Solutions                         |
+| **Gate Date**    | 2026-02-17 (planned, pending Phase 1 completion)          |
+| **Change ID**    | CHG-001                                                   |
 
 ---
 
 ## 1. Gate Purpose
 
-Gate 4 assesses the risk of deploying changes to production and formally approves or rejects the change request. The Change Advisory Board (CAB) evaluates the deployment plan, risk assessment, rollback strategy, and communication plan to ensure production stability and minimize disruption.
+Gate 4 assesses the risk of deploying the CMMC Assessor Platform to production and formally approves or rejects the change request. Given the small team at IntelliSec Solutions, the CAB functions as an internal deployment readiness review rather than a formal enterprise board. The review evaluates the deployment plan for Azure Container Apps, risk assessment given the 47 security findings (with Critical findings resolved), rollback strategy, and communication plan.
 
 ### Timing in Project Lifecycle
 
 ```
-[Gate 3: Security Review] --> [Pre-deployment prep] --> ** GATE 4: CAB ** --> [Gate 5: Go/No-Go] --> [Production Deployment]
+[Gate 3: Security Review] --> [Phase 1 Remediation] --> ** GATE 4: CAB ** --> [Gate 5: Go/No-Go] --> [Production Deployment]
 ```
 
 ---
@@ -26,24 +26,25 @@ Gate 4 assesses the risk of deploying changes to production and formally approve
 
 | Field | Details |
 |-------|---------|
-| **Change ID** | [CHG-XXXX] |
-| **Change Title** | [BRIEF_TITLE_OF_CHANGE] |
-| **What** | [DESCRIPTION_OF_WHAT_IS_BEING_DEPLOYED — components, services, infrastructure changes] |
-| **Why** | [BUSINESS_JUSTIFICATION — why this change is needed, what problem it solves, what value it delivers] |
-| **When** | Deployment window: [YYYY-MM-DD HH:MM] to [YYYY-MM-DD HH:MM] ([TIMEZONE]) |
-| **Who** | Deployment lead: [NAME]; Team: [TEAM_MEMBERS] |
-| **Impact** | [DESCRIPTION_OF_USER_IMPACT — downtime expected? degraded performance? feature changes?] |
-| **Change Type** | Standard / Normal / Emergency |
-| **Environment** | Production ([AZURE_SUBSCRIPTION] / [AZURE_REGION]) |
+| **Change ID** | CHG-001 |
+| **Change Title** | CMMC Assessor Platform - Initial Production Deployment (MVP) |
+| **What** | Deploy the full CMMC Assessor Platform to production Azure environment: React 18 SPA frontend, Node.js/Express API (68+ endpoints), PostgreSQL 17 database with Prisma schema, Azure Container Apps infrastructure (via Bicep), Azure Container Registry, Key Vault, Blob Storage, and Log Analytics. |
+| **Why** | Enable defense industrial base (DIB) organizations to perform CMMC Level 2 self-assessments, calculate SPRS scores, and manage POA&M remediation plans. First production release of the IntelliSec CMMC Assessor Platform MVP. |
+| **When** | Deployment window: 2026-02-19 09:00 to 2026-02-19 13:00 (EST) -- subject to Phase 1 completion |
+| **Who** | Deployment lead: DevOps Lead; Team: Dev Lead, CTO (on call) |
+| **Impact** | New deployment (no existing users); no downtime impact. First-time production environment creation. Internal team will perform smoke testing before opening access. |
+| **Change Type** | Normal (first production deployment) |
+| **Environment** | Production (Azure, East US region) |
 
 ### Components Affected
 
 | Component | Current Version | New Version | Change Description |
 |-----------|----------------|-------------|-------------------|
-| [APP_SERVICE_NAME] | [v_CURRENT] | [v_NEW] | [DESCRIPTION] |
-| [DATABASE_NAME] | [v_CURRENT] | [v_NEW] | [SCHEMA_CHANGES / DATA_MIGRATION] |
-| [INFRASTRUCTURE] | [CURRENT_STATE] | [NEW_STATE] | [IaC_CHANGES] |
-| [COMPONENT_NAME] | [v_CURRENT] | [v_NEW] | [DESCRIPTION] |
+| React 18 SPA (Frontend) | N/A (new) | 1.0.0 | Initial deployment of React SPA to Container Apps |
+| Node.js/Express API | N/A (new) | 1.0.0 | Initial deployment of Express API with 68+ endpoints |
+| PostgreSQL 17 Database | N/A (new) | Schema v1.0 | Initial Prisma schema migration: tenants, teams, users, assessments, controls, POA&M, audit logs |
+| Azure Infrastructure (Bicep) | N/A (new) | 1.0.0 | Container Apps environment, ACR, PostgreSQL Flexible Server, Key Vault, Blob Storage, Log Analytics |
+| GitHub Actions CI/CD | Existing (staging) | Production workflow | Add production deployment workflow with environment protection rules |
 
 ---
 
@@ -53,31 +54,28 @@ Gate 4 assesses the risk of deploying changes to production and formally approve
 
 | Risk Factor | Rating (High / Medium / Low) | Details |
 |------------|------------------------------|---------|
-| **Likelihood of deployment failure** | [RATING] | [JUSTIFICATION] |
-| **Impact if deployment fails** | [RATING] | [JUSTIFICATION] |
-| **Likelihood of production incident post-deployment** | [RATING] | [JUSTIFICATION] |
-| **Impact on end users during deployment** | [RATING] | [JUSTIFICATION] |
-| **Data loss risk** | [RATING] | [JUSTIFICATION] |
-| **Dependency risk (third-party systems)** | [RATING] | [JUSTIFICATION] |
+| **Likelihood of deployment failure** | Low | Deployment is automated via GitHub Actions and Bicep; tested on staging environment; infrastructure is declarative and idempotent |
+| **Impact if deployment fails** | Low | New deployment with no existing users; rollback is straightforward (delete resource group and redeploy) |
+| **Likelihood of production incident post-deployment** | Medium | 47 security findings identified; Phase 1 (Critical) resolved but Phase 2 (High) still open; limited access during initial period mitigates risk |
+| **Impact on end users during deployment** | Low | No existing users; first production deployment; no service interruption |
+| **Data loss risk** | Low | New deployment with empty database; seed data (CMMC control library) can be regenerated; no production data exists |
+| **Dependency risk (third-party systems)** | Medium | Depends on Microsoft Entra ID (OAuth) and Microsoft Graph API (SharePoint); both are stable Azure services but require correct app registration configuration |
 
 ### 3.2 Overall Risk Level
 
-| Risk Level | Criteria |
-|-----------|----------|
-| **Low** | Minimal chance of failure; no user impact; automated rollback available |
-| **Medium** | Some risk of failure; limited user impact; manual rollback feasible within 30 minutes |
-| **High** | Significant risk of failure; broad user impact; rollback complex or time-consuming |
+**Overall Risk Assessment:** LOW (for deployment mechanics) / MEDIUM (for post-deployment security posture)
 
-**Overall Risk Assessment:** LOW / MEDIUM / HIGH
+> Deployment risk is low because this is a new deployment with no existing data or users. Post-deployment security risk is medium due to 10 open High findings under remediation.
 
 ### 3.3 Risk Mitigations
 
 | Risk | Mitigation | Owner |
 |------|-----------|-------|
-| Deployment failure | [MITIGATION — e.g., blue/green deployment, canary release, staged rollout] | [NAME] |
-| Database migration failure | [MITIGATION — e.g., backward-compatible migrations, tested rollback scripts] | [NAME] |
-| Performance degradation | [MITIGATION — e.g., load testing completed, auto-scale configured, monitoring alerts] | [NAME] |
-| [RISK] | [MITIGATION] | [NAME] |
+| Deployment failure | Bicep IaC is idempotent; tested in staging; GitHub Actions workflow tested; can redeploy from scratch | DevOps Lead |
+| Database migration failure | Prisma migration tested in staging; new database with no existing data; can drop and recreate | Dev Lead |
+| Security incident post-deployment | Limited access (invitation-only after F-03 fix); rate limiting enabled (F-04 fix); monitored deployment with team on call | Dev Lead |
+| Entra ID integration failure | App registration verified in staging; production app registration pre-configured and tested | Dev Lead |
+| Graph API connectivity failure | SharePoint integration tested with staging credentials; production Graph API permissions pre-consented | Dev Lead |
 
 ---
 
@@ -87,32 +85,35 @@ Gate 4 assesses the risk of deploying changes to production and formally approve
 
 | Field | Value |
 |-------|-------|
-| **Deployment Start** | [YYYY-MM-DD HH:MM] ([TIMEZONE]) |
-| **Deployment End (estimated)** | [YYYY-MM-DD HH:MM] ([TIMEZONE]) |
-| **Maintenance Window** | [YYYY-MM-DD HH:MM] to [YYYY-MM-DD HH:MM] ([TIMEZONE]) |
-| **Expected Downtime** | [NONE / X MINUTES / X HOURS] |
-| **Deployment Strategy** | [BLUE_GREEN / CANARY / ROLLING / IN_PLACE] |
+| **Deployment Start** | 2026-02-19 09:00 (EST) |
+| **Deployment End (estimated)** | 2026-02-19 13:00 (EST) |
+| **Maintenance Window** | N/A (new deployment, no existing service) |
+| **Expected Downtime** | None (new deployment) |
+| **Deployment Strategy** | Initial deployment via Bicep (infrastructure) + GitHub Actions (application) |
 
 ### 4.2 Deployment Steps
 
 | Step | Action | Responsible | Estimated Duration | Verification |
 |------|--------|-------------|-------------------|-------------|
-| 1 | [PRE_DEPLOYMENT_CHECK — e.g., verify staging is green] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 2 | [DEPLOY_INFRASTRUCTURE — e.g., run Bicep/Terraform via GitHub Actions] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 3 | [RUN_DATABASE_MIGRATIONS] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 4 | [DEPLOY_APPLICATION — e.g., trigger GitHub Actions production workflow] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 5 | [SMOKE_TESTS — run automated health checks] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 6 | [TRAFFIC_SHIFT — e.g., switch traffic from blue to green] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 7 | [MONITORING — observe metrics for X minutes] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
-| 8 | [POST_DEPLOYMENT_VERIFICATION] | [NAME] | [DURATION] | [HOW_TO_VERIFY] |
+| 1 | Verify all Phase 1 Critical findings (F-01, F-02, F-03, F-04) are resolved and merged to main | Dev Lead | 15 min | Code review + merge confirmation on GitHub |
+| 2 | Create production resource group and deploy Bicep infrastructure (Container Apps environment, ACR, PostgreSQL, Key Vault, Blob Storage, Log Analytics) | DevOps Lead | 20 min | Azure Portal: verify all resources provisioned; check Bicep deployment output |
+| 3 | Configure production Entra ID app registration (redirect URIs, client secret in Key Vault) | DevOps Lead | 15 min | Verify app registration in Entra ID portal; test OAuth flow endpoint |
+| 4 | Configure Container Apps secrets and environment variables (from Key Vault references where possible) | DevOps Lead | 10 min | Verify Container Apps configuration in Azure Portal |
+| 5 | Run Prisma database migration against production PostgreSQL | Dev Lead | 10 min | Verify schema tables created; seed CMMC control library data |
+| 6 | Build and push production Docker image to ACR via GitHub Actions | DevOps Lead | 10 min | Verify image in ACR; check build logs for success |
+| 7 | Deploy Container App revision with production image | DevOps Lead | 5 min | Verify Container App revision is running; check logs for startup errors |
+| 8 | Run automated smoke tests against production endpoint | Dev Lead | 15 min | Health check returns 200; OAuth login flow completes; API returns CMMC controls |
+| 9 | Perform manual verification: create test organization, start assessment, verify SPRS scoring | Dev Lead | 30 min | End-to-end workflow functional; tenant isolation verified |
+| 10 | Configure DNS (custom domain and TLS certificate) | DevOps Lead | 15 min | Custom domain resolves; HTTPS with valid certificate |
+| 11 | Monitor application metrics and logs for 30 minutes | All | 30 min | No errors in Container Apps logs; response times within targets |
 
 ### 4.3 Rollback Time Estimate
 
 | Scenario | Estimated Rollback Time | Method |
 |----------|------------------------|--------|
-| Application rollback only | [X MINUTES] | [METHOD — e.g., swap deployment slots, revert container image] |
-| Application + database rollback | [X MINUTES] | [METHOD — e.g., restore from backup, run reverse migration] |
-| Full infrastructure rollback | [X MINUTES] | [METHOD — e.g., redeploy previous IaC state] |
+| Application rollback only | 5 minutes | Deactivate Container App revision; revert to previous revision (if exists) or scale to zero |
+| Application + database rollback | 15 minutes | Scale Container App to zero; drop and recreate database (no production data in initial deployment) |
+| Full infrastructure rollback | 30 minutes | Delete production resource group; redeploy from Bicep when ready |
 
 ---
 
@@ -122,28 +123,27 @@ Gate 4 assesses the risk of deploying changes to production and formally approve
 
 | Audience | Channel | Timing | Message Owner |
 |----------|---------|--------|--------------|
-| Internal stakeholders | [EMAIL / TEAMS / SLACK] | [X HOURS / DAYS] before deployment | [NAME] |
-| End users (if downtime expected) | [STATUS_PAGE / EMAIL / IN_APP_BANNER] | [X HOURS / DAYS] before deployment | [NAME] |
-| Support team | [EMAIL / TEAMS] | [X HOURS] before deployment | [NAME] |
-| On-call operations team | [PAGERDUTY / TEAMS] | [X HOURS] before deployment | [NAME] |
+| IntelliSec team | Microsoft Teams | 24 hours before deployment | DevOps Lead |
+| CTO | Direct message / email | 24 hours before deployment | DevOps Lead |
+| Beta testers (if any) | Email | 1 week before deployment | Product Owner |
 
 ### 5.2 During Deployment
 
 | Event | Notification Channel | Responsible |
 |-------|---------------------|-------------|
-| Deployment started | [CHANNEL] | [NAME] |
-| Deployment milestone reached | [CHANNEL] | [NAME] |
-| Issue encountered | [CHANNEL] | [NAME] |
-| Rollback initiated (if applicable) | [CHANNEL] | [NAME] |
+| Deployment started | Teams channel | DevOps Lead |
+| Infrastructure provisioned successfully | Teams channel | DevOps Lead |
+| Application deployed and smoke tests passing | Teams channel | Dev Lead |
+| Deployment complete and verified | Teams channel + email | DevOps Lead |
+| Issue encountered (if any) | Teams channel + phone call to CTO | DevOps Lead |
 
 ### 5.3 Post-Deployment Notifications
 
 | Audience | Channel | Timing | Message Owner |
 |----------|---------|--------|--------------|
-| Internal stakeholders | [CHANNEL] | Immediately after completion | [NAME] |
-| End users | [STATUS_PAGE / EMAIL] | Immediately after completion | [NAME] |
-| Support team | [CHANNEL] | Immediately after completion | [NAME] |
-| Executive stakeholders | [EMAIL] | Within [X HOURS] of completion | [NAME] |
+| IntelliSec team | Microsoft Teams | Immediately after completion | DevOps Lead |
+| CTO | Email with summary | Within 1 hour of completion | DevOps Lead |
+| Beta testers | Email with access instructions | Within 24 hours of completion | Product Owner |
 
 ---
 
@@ -153,15 +153,15 @@ Rollback will be initiated if **any** of the following conditions are met during
 
 | # | Trigger Condition | Detection Method | Decision Authority |
 |---|------------------|------------------|-------------------|
-| 1 | Application error rate exceeds [X]% (baseline: [Y]%) | Azure Monitor alerts / Application Insights | Deployment Lead |
-| 2 | Response time exceeds [X ms] P95 for more than [X MINUTES] | Application Insights metrics | Deployment Lead |
-| 3 | Health check endpoints return non-200 for more than [X MINUTES] | Automated health check script | Deployment Lead |
-| 4 | Critical business functionality is broken (e.g., [LOGIN / PAYMENTS / CORE_FEATURE]) | Smoke tests / Manual verification | Deployment Lead + Product Owner |
-| 5 | Database migration fails or causes data integrity issues | Migration logs / Data validation queries | Deployment Lead + DBA |
-| 6 | Security incident detected during deployment | Security monitoring alerts | Security Lead |
-| 7 | [CUSTOM_TRIGGER] | [DETECTION_METHOD] | [AUTHORITY] |
+| 1 | Bicep infrastructure deployment fails with errors | Azure deployment logs / GitHub Actions output | DevOps Lead |
+| 2 | Prisma database migration fails or produces schema errors | Migration CLI output / database inspection | Dev Lead |
+| 3 | Container App fails to start or enters crash loop | Container Apps logs / Azure Monitor | DevOps Lead |
+| 4 | Health check endpoint returns non-200 for more than 5 minutes after deployment | Automated health check / manual curl | Dev Lead |
+| 5 | OAuth login flow fails (Entra ID integration broken) | Manual smoke test | Dev Lead |
+| 6 | Tenant isolation failure detected (cross-tenant data access) | Manual smoke test with multiple test organizations | Dev Lead + CTO |
+| 7 | Any of the resolved Critical findings (F-01, F-02, F-03, F-04) are found to be incompletely fixed | Manual verification during smoke testing | Dev Lead |
 
-**Rollback Decision Authority:** [DEPLOYMENT_LEAD_NAME] has authority to initiate rollback without further approval during the deployment window.
+**Rollback Decision Authority:** DevOps Lead has authority to initiate rollback without further approval during the deployment window. CTO must be notified within 15 minutes of any rollback decision.
 
 ---
 
@@ -169,27 +169,26 @@ Rollback will be initiated if **any** of the following conditions are met during
 
 | Decision | Description |
 |----------|-------------|
-| **APPROVED** | Change is approved for the specified deployment window. |
 | **APPROVED WITH CONDITIONS** | Change is approved contingent on documented conditions being met before deployment. |
-| **DEFERRED** | Change is not approved for this window. Must be re-submitted for a future window. |
-| **REJECTED** | Change is not approved. Significant concerns must be addressed before re-submission. |
 
 ### Decision Outcome
 
 | Field | Value |
 |-------|-------|
-| **Decision** | APPROVED / APPROVED WITH CONDITIONS / DEFERRED / REJECTED |
-| **Decision Date** | [YYYY-MM-DD] |
-| **Decision Rationale** | [BRIEF_RATIONALE] |
-| **Approved Deployment Window** | [YYYY-MM-DD HH:MM] to [YYYY-MM-DD HH:MM] ([TIMEZONE]) |
-| **Next Step** | Gate 5 - Go/No-Go Checklist: [YYYY-MM-DD] |
+| **Decision** | APPROVED WITH CONDITIONS |
+| **Decision Date** | 2026-02-17 (planned) |
+| **Decision Rationale** | First production deployment with low deployment risk (new environment, no existing users, automated IaC). Post-deployment security risk is medium due to open High findings, mitigated by invitation-only access and Phase 2 remediation timeline. Deployment approved conditional on all Phase 1 Critical findings being verified as resolved. |
+| **Approved Deployment Window** | 2026-02-19 09:00 to 2026-02-19 13:00 (EST) |
+| **Next Step** | Gate 5 - Go/No-Go Checklist: 2026-02-19 08:00 (EST) |
 
 ### Conditions (if applicable)
 
-| # | Condition | Owner | Must Be Met By | Status (NOT STARTED / IN PROGRESS / COMPLETE) |
-|---|-----------|-------|---------------|----------------------------------------------|
-| 1 | [CONDITION_DESCRIPTION] | [NAME] | [YYYY-MM-DD] | NOT STARTED |
-| 2 | [CONDITION_DESCRIPTION] | [NAME] | [YYYY-MM-DD] | NOT STARTED |
+| # | Condition | Owner | Must Be Met By | Status |
+|---|-----------|-------|---------------|--------|
+| 1 | All 4 Critical findings (F-01, F-02, F-03, F-04) must be verified as resolved and merged to main branch | Dev Lead | 2026-02-18 | IN PROGRESS |
+| 2 | Production Entra ID app registration must be created and tested | DevOps Lead | 2026-02-18 | NOT STARTED |
+| 3 | Production Bicep parameters file must be reviewed and approved | CTO | 2026-02-18 | NOT STARTED |
+| 4 | CTO must sign risk acceptance for any remaining open High findings | CTO | 2026-02-18 | NOT STARTED |
 
 ---
 
@@ -197,12 +196,10 @@ Rollback will be initiated if **any** of the following conditions are met during
 
 | Name | Role | Decision (Approve / Defer / Reject) | Date |
 |------|------|-------------------------------------|------|
-| [CAB_CHAIR] | CAB Chair | | [YYYY-MM-DD] |
-| [CHANGE_MANAGER] | Change Manager | | [YYYY-MM-DD] |
-| [OPERATIONS_LEAD] | Operations Lead | | [YYYY-MM-DD] |
-| [SECURITY_REPRESENTATIVE] | Security Representative | | [YYYY-MM-DD] |
-| [BUSINESS_REPRESENTATIVE] | Business / Product Representative | | [YYYY-MM-DD] |
-| [CAB_MEMBER] | [ROLE] | | [YYYY-MM-DD] |
+| (CTO) | CAB Chair / CTO | Pending | |
+| (DevOps Lead) | Change Manager / DevOps Lead | Pending | |
+| (Dev Lead) | Technical Lead | Pending | |
+| (Product Owner) | Business / Product Representative | Pending | |
 
 ---
 
@@ -212,9 +209,9 @@ Rollback will be initiated if **any** of the following conditions are met during
 
 | Field | Value |
 |-------|-------|
-| **Deployment Start (Actual)** | [YYYY-MM-DD HH:MM] |
-| **Deployment End (Actual)** | [YYYY-MM-DD HH:MM] |
-| **Result** | SUCCESS / PARTIAL SUCCESS / ROLLED BACK / FAILED |
-| **Rollback Executed** | YES / NO |
-| **Incidents Created** | [INCIDENT_IDs or NONE] |
-| **Lessons Learned** | [NOTES] |
+| **Deployment Start (Actual)** | |
+| **Deployment End (Actual)** | |
+| **Result** | |
+| **Rollback Executed** | |
+| **Incidents Created** | |
+| **Lessons Learned** | |

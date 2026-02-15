@@ -3,15 +3,17 @@
 | **Metadata**     | **Value**                              |
 |------------------|----------------------------------------|
 | Page Title       | Post-Deployment Verification           |
-| Last Updated     | [YYYY-MM-DD]                           |
-| Status           | [Draft / In Review / Approved]         |
-| Owner            | [TEAM OR INDIVIDUAL NAME]              |
+| Last Updated     | 2026-02-14                             |
+| Status           | Draft                                  |
+| Owner            | IntelliSec Solutions                   |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the post-deployment verification process for the [PROJECT NAME] platform. It provides structured checklists and criteria for validating that a deployment to any environment is successful -- covering smoke tests, health checks, monitoring, performance, functional verification, security, data integrity, and integration validation. Completing this process is required before a deployment is declared successful.
+This document defines the post-deployment verification process for the CMMC Assessor Platform. It provides structured checklists and criteria for validating that a deployment to production is successful -- covering smoke tests, health checks, monitoring, functional verification, and security checks. The current verification process is mostly manual and informal. This document establishes a target process.
+
+**Current State:** Post-deployment verification is informal and ad-hoc. There are no automated smoke tests, no Application Insights to verify performance baselines, and no formal sign-off process. Verification typically consists of manually checking the health endpoint and loading the frontend.
 
 ---
 
@@ -21,31 +23,29 @@ This document defines the post-deployment verification process for the [PROJECT 
 
 | Phase                          | Timing After Deployment     | Duration     | Responsible         |
 |--------------------------------|-----------------------------|--------------|---------------------|
-| Phase 1: Smoke Tests           | Immediately (T+0)          | 5-10 minutes | [On-Call / SRE]     |
-| Phase 2: Health Checks         | T+5 minutes                | 5 minutes    | [On-Call / SRE]     |
-| Phase 3: Monitoring Validation | T+10 minutes               | 10 minutes   | [SRE]               |
-| Phase 4: Functional Verification | T+15 minutes             | 15-30 minutes| [QA / Engineers]    |
-| Phase 5: Performance Comparison| T+30 minutes               | 15 minutes   | [SRE]               |
-| Phase 6: Security Verification | T+30 minutes               | 10 minutes   | [SRE / Security]    |
-| Phase 7: Data Verification     | T+30 minutes               | 10 minutes   | [DBA / Engineers]   |
-| Phase 8: Integration Verification | T+30 minutes            | 15 minutes   | [Engineers]         |
-| Phase 9: Final Sign-Off        | T+60 minutes (minimum)    | 5 minutes    | [Release Manager]   |
+| Phase 1: Smoke Tests           | Immediately (T+0)          | 2-5 minutes  | Deploying engineer  |
+| Phase 2: Health Checks         | T+2 minutes                | 2 minutes    | Deploying engineer  |
+| Phase 3: Monitoring Validation | T+5 minutes                | 5 minutes    | Deploying engineer  |
+| Phase 4: Functional Verification | T+10 minutes             | 10 minutes   | Deploying engineer  |
+| Phase 5: Final Sign-Off        | T+30 minutes (minimum)    | 2 minutes    | Deploying engineer  |
+
+> **Note:** Phases 5-8 from the template (Performance Comparison, Security Verification, Data Verification, Integration Verification) are NOT IMPLEMENTED due to lack of APM tooling and automated test suites.
 
 ### 2.2 Verification Decision Flow
 
 ```
-All Phase 1-3 checks pass?
+Phases 1-2 checks pass?
   NO  -> INITIATE ROLLBACK (see Rollback Procedures)
   YES -> Continue
 
-Phase 4-8 checks pass?
+Phase 3-4 checks pass?
   NO  -> Assess severity:
          Critical failure -> ROLLBACK
          Minor issue -> LOG ISSUE, continue with known issue noted
   YES -> Continue
 
-Monitoring stable for 60+ minutes?
-  NO  -> Extend monitoring period, escalate if degrading
+No new errors in Log Analytics for 30+ minutes?
+  NO  -> Investigate, extend monitoring period
   YES -> DECLARE DEPLOYMENT SUCCESSFUL
 ```
 
@@ -53,39 +53,34 @@ Monitoring stable for 60+ minutes?
 
 ## 3. Phase 1: Smoke Test Checklist
 
-Smoke tests verify that the most critical user paths are functional immediately after deployment.
+Smoke tests verify that the most critical paths are functional immediately after deployment.
 
-### 3.1 Automated Smoke Tests
-
-| Test                                      | Endpoint / Flow                             | Expected Result          | Timeout | Status       |
-|-------------------------------------------|---------------------------------------------|--------------------------|---------|--------------|
-| Application loads                         | `GET /`                                     | HTTP 200, page renders   | 10s     | [ ] Pass/Fail |
-| Health check passes                       | `GET /health`                               | HTTP 200, `"healthy"`    | 5s      | [ ] Pass/Fail |
-| Readiness check passes                    | `GET /health/ready`                         | HTTP 200, all deps up    | 10s     | [ ] Pass/Fail |
-| User login                                | `POST /api/auth/login`                      | HTTP 200, token returned | 10s     | [ ] Pass/Fail |
-| API basic CRUD                            | `GET /api/v2/[RESOURCE]`                    | HTTP 200, data returned  | 10s     | [ ] Pass/Fail |
-| Static assets load                        | `GET /static/main.js`                       | HTTP 200, content valid  | 5s      | [ ] Pass/Fail |
-| [CRITICAL PATH TEST]                      | [ENDPOINT / FLOW]                           | [EXPECTED RESULT]        | [XXs]   | [ ] Pass/Fail |
-
-### 3.2 Manual Smoke Tests (if automated not available)
+### 3.1 Manual Smoke Tests
 
 | # | Test                                          | Steps                                               | Expected Result             | Status       |
 |---|-----------------------------------------------|------------------------------------------------------|-----------------------------|--------------|
-| 1 | Navigate to application URL                   | Open browser, go to `https://[APP_URL]`              | Page loads without errors   | [ ] Pass/Fail |
-| 2 | Log in with test account                      | Enter test credentials, submit                       | Dashboard loads             | [ ] Pass/Fail |
-| 3 | Perform core business action                  | [DESCRIBE THE ACTION, e.g., create an order]         | Action succeeds             | [ ] Pass/Fail |
-| 4 | Verify data display                           | [DESCRIBE WHAT TO CHECK, e.g., order history loads]  | Data is current and correct | [ ] Pass/Fail |
-| 5 | [TEST DESCRIPTION]                            | [STEPS]                                              | [EXPECTED]                  | [ ] Pass/Fail |
+| 1 | API health endpoint responds                  | `curl -s https://api.cmmc.intellisecops.com/api/health` | HTTP 200, JSON with status | [ ] Pass/Fail |
+| 2 | Frontend loads                                | Open browser: `https://cmmc.intellisecops.com`       | Page loads without errors   | [ ] Pass/Fail |
+| 3 | Frontend can reach API                        | Open browser dev tools, check network requests       | API calls return 200        | [ ] Pass/Fail |
+| 4 | User login works                              | Log in with test credentials                         | Dashboard loads             | [ ] Pass/Fail |
+| 5 | Basic navigation works                        | Navigate to assessments page                          | Page renders with data      | [ ] Pass/Fail |
 
-### Smoke Test Execution
+### 3.2 Automated Smoke Tests
+
+**Status: NOT IMPLEMENTED** -- No automated smoke test suite exists.
 
 | Attribute                  | Value                                              |
 |----------------------------|----------------------------------------------------|
-| Smoke Test Tool            | [Postman / Newman / Custom script / Cypress]       |
-| Execution Command          | `[COMMAND TO RUN SMOKE TESTS]`                     |
-| Test Suite Location        | [https://github.com/ORG/REPO/tests/smoke]          |
-| Expected Duration          | [5-10 minutes]                                     |
-| Pass Criteria              | [All tests pass. Any failure triggers rollback assessment.] |
+| Smoke Test Tool            | NOT IMPLEMENTED                                    |
+| Execution Command          | N/A                                                |
+| Expected Duration          | N/A                                                |
+| Pass Criteria              | N/A                                                |
+
+### Planned Improvements
+
+- Create a Postman collection or shell script for automated smoke tests
+- Run smoke tests automatically as part of the CD pipeline
+- Include API endpoint tests for key routes (login, assessments, reports)
 
 ---
 
@@ -93,68 +88,51 @@ Smoke tests verify that the most critical user paths are functional immediately 
 
 ### 4.1 Service Health Endpoints
 
-| Service                  | Health Endpoint                                | Expected Response                                  | Status       |
-|--------------------------|------------------------------------------------|----------------------------------------------------|--------------|
-| Web Application          | `https://[APP_URL]/health`                     | `{"status":"healthy","version":"[VERSION]"}`       | [ ] Pass/Fail |
-| API (AKS)                | `https://[API_URL]/health`                     | `{"status":"healthy","version":"[VERSION]"}`       | [ ] Pass/Fail |
-| API Readiness            | `https://[API_URL]/health/ready`               | `{"status":"ready","db":"ok","cache":"ok","queue":"ok"}` | [ ] Pass/Fail |
-| Azure Functions          | `https://[FUNC_URL]/api/health`                | `{"status":"healthy"}`                             | [ ] Pass/Fail |
-| Legacy Service (VM)      | `http://[VM_INTERNAL_IP]:[PORT]/health`        | `{"status":"ok"}`                                  | [ ] Pass/Fail |
-| [SERVICE]                | [ENDPOINT]                                     | [EXPECTED RESPONSE]                                | [ ] Pass/Fail |
+| Service                  | Health Endpoint                                        | Expected Response                      | Status       |
+|--------------------------|--------------------------------------------------------|----------------------------------------|--------------|
+| Backend API (cmmc-api)   | `https://api.cmmc.intellisecops.com/api/health`        | HTTP 200, JSON with health status      | [ ] Pass/Fail |
+| Frontend (cmmc-web)      | `https://cmmc.intellisecops.com`                       | HTTP 200, HTML page renders            | [ ] Pass/Fail |
+
+> **Note:** The health endpoint currently returns configuration information (F-38). The response should be verified for HTTP 200 status, but the content should not be relied upon for version verification until F-38 is remediated.
 
 ### 4.2 Azure Resource Health
 
 | Resource                      | Check Method                                    | Expected State       | Status       |
 |-------------------------------|------------------------------------------------|----------------------|--------------|
-| AKS Cluster                   | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| App Service                   | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| Azure Functions               | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| SQL Database                  | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| Redis Cache                   | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| Service Bus                   | Azure Portal > Resource Health                 | Available            | [ ] Pass/Fail |
-| [RESOURCE]                    | [CHECK METHOD]                                 | [EXPECTED STATE]     | [ ] Pass/Fail |
+| cmmc-api (Container App)      | Azure Portal > Container Apps > cmmc-api       | Running              | [ ] Pass/Fail |
+| cmmc-web (Container App)      | Azure Portal > Container Apps > cmmc-web       | Running              | [ ] Pass/Fail |
+| psql-cmmc-assessor-prod       | Azure Portal > PostgreSQL > Overview           | Available            | [ ] Pass/Fail |
+| kv-cmmc-assessor-prod         | Azure Portal > Key Vault > Overview            | Available            | [ ] Pass/Fail |
 
-### 4.3 AKS-Specific Health Checks
+### 4.3 Container App Revision Checks
 
 | Check                             | Command                                                          | Expected Result                | Status       |
 |-----------------------------------|------------------------------------------------------------------|--------------------------------|--------------|
-| All pods running                  | `kubectl get pods -n [NAMESPACE] -l app=[APP]`                  | All pods STATUS=Running        | [ ] Pass/Fail |
-| No pod restarts                   | `kubectl get pods -n [NAMESPACE]` -- check RESTARTS column      | RESTARTS = 0 (for new pods)   | [ ] Pass/Fail |
-| Correct image version             | `kubectl get pods -n [NS] -o jsonpath='{.items[*].spec.containers[*].image}'` | Image tag = [VERSION]  | [ ] Pass/Fail |
-| Kubernetes events clean           | `kubectl get events -n [NAMESPACE] --sort-by='.lastTimestamp'`  | No Warning/Error events        | [ ] Pass/Fail |
-| Ingress responding                | `kubectl get ingress -n [NAMESPACE]`                            | ADDRESS populated              | [ ] Pass/Fail |
-| HPA working (if applicable)       | `kubectl get hpa -n [NAMESPACE]`                                | TARGETS show current metrics   | [ ] Pass/Fail |
+| Active revision running           | `az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod -o table` | Latest revision active, running | [ ] Pass/Fail |
+| Correct image deployed            | `az containerapp show --name cmmc-api --resource-group rg-cmmc-assessor-prod --query "properties.template.containers[0].image"` | Expected image tag | [ ] Pass/Fail |
+| No revision failures              | Check Azure Portal > Container App > Revisions                  | No failed revisions            | [ ] Pass/Fail |
 
 ---
 
 ## 5. Phase 3: Monitoring Verification
 
-### 5.1 Metrics Flowing
+### 5.1 Log Analytics Check
 
-| Metric Source              | Check                                                  | Expected                                | Status       |
-|----------------------------|--------------------------------------------------------|-----------------------------------------|--------------|
-| Application Insights       | Live Metrics stream is active                          | Requests, dependencies, exceptions visible | [ ] Pass/Fail |
-| Azure Monitor              | Metrics blade shows current data for all resources     | No gaps in last 10 minutes              | [ ] Pass/Fail |
-| Log Analytics              | Recent logs ingested from all expected sources         | Logs from last 5 minutes visible        | [ ] Pass/Fail |
-| Grafana Dashboards         | All panels loading with current data                   | No "No Data" panels                     | [ ] Pass/Fail |
-| Custom Metrics             | Application custom metrics being emitted               | Custom metrics visible in App Insights  | [ ] Pass/Fail |
+| Check                              | Method                                                  | Expected                                | Status       |
+|------------------------------------|---------------------------------------------------------|-----------------------------------------|--------------|
+| Container App logs flowing         | Log Analytics query: `ContainerAppConsoleLogs_CL \| where TimeGenerated > ago(5m) \| take 10` | Recent log entries visible | [ ] Pass/Fail |
+| No error spikes                    | `ContainerAppConsoleLogs_CL \| where TimeGenerated > ago(10m) \| where Log_s contains "error" \| count` | Error count within baseline | [ ] Pass/Fail |
+| System logs clean                  | `ContainerAppSystemLogs_CL \| where TimeGenerated > ago(10m) \| where Type_s == "Error" \| count` | No system errors | [ ] Pass/Fail |
 
-### 5.2 Alert Rules Active
+### 5.2 Azure Monitor Quick Check
 
-| Verification                              | Method                                            | Expected                     | Status       |
-|-------------------------------------------|---------------------------------------------------|------------------------------|--------------|
-| Alert rules are enabled                   | Azure Monitor > Alerts > Alert rules              | All production rules enabled | [ ] Pass/Fail |
-| No active alerts firing                   | Azure Monitor > Alerts > Summary                  | No unexpected fired alerts   | [ ] Pass/Fail |
-| Availability tests running                | Application Insights > Availability               | Tests passing from all locations | [ ] Pass/Fail |
+| Check                              | Method                                            | Expected                     | Status       |
+|------------------------------------|----------------------------------------------------|------------------------------|--------------|
+| Container App CPU normal           | Azure Portal > cmmc-api > Metrics > CPU            | Within baseline range        | [ ] Pass/Fail |
+| Container App memory normal        | Azure Portal > cmmc-api > Metrics > Memory         | Within baseline range        | [ ] Pass/Fail |
+| PostgreSQL connections normal      | Azure Portal > PostgreSQL > Metrics > Connections   | Within baseline range        | [ ] Pass/Fail |
 
-### 5.3 Dashboard Spot-Check
-
-| Dashboard                      | URL                                            | What to Check                              | Status       |
-|--------------------------------|------------------------------------------------|--------------------------------------------|--------------|
-| System Health Overview         | [GRAFANA URL]                                  | All panels green / within thresholds       | [ ] Pass/Fail |
-| Application Performance        | [APP INSIGHTS URL]                             | Request rate, error rate, response time OK | [ ] Pass/Fail |
-| AKS Cluster Health             | [GRAFANA URL]                                  | Node/pod health, resource utilization OK   | [ ] Pass/Fail |
-| [DASHBOARD]                    | [URL]                                          | [WHAT TO CHECK]                            | [ ] Pass/Fail |
+> **Note:** Application Insights is NOT IMPLEMENTED. There is no application-level telemetry to compare pre vs. post deployment metrics. Verification is limited to platform metrics and manual checks.
 
 ---
 
@@ -164,66 +142,50 @@ Smoke tests verify that the most critical user paths are functional immediately 
 
 | # | Business Flow                         | Test Steps                                                    | Expected Result                         | Priority   | Status       |
 |---|---------------------------------------|---------------------------------------------------------------|-----------------------------------------|------------|--------------|
-| 1 | User Registration                     | Register new account with test email                          | Account created, confirmation email sent | [P1]       | [ ] Pass/Fail |
-| 2 | User Login / Authentication           | Log in with valid credentials                                 | Dashboard loads, session created         | [P1]       | [ ] Pass/Fail |
-| 3 | [Core Business Action 1]             | [DESCRIBE STEPS]                                              | [EXPECTED RESULT]                       | [P1]       | [ ] Pass/Fail |
-| 4 | [Core Business Action 2]             | [DESCRIBE STEPS]                                              | [EXPECTED RESULT]                       | [P1]       | [ ] Pass/Fail |
-| 5 | Search Functionality                  | Search for known item                                         | Results returned correctly               | [P2]       | [ ] Pass/Fail |
-| 6 | Report / Export Generation            | Generate a standard report                                    | Report downloads successfully            | [P2]       | [ ] Pass/Fail |
-| 7 | Email / Notification Delivery        | Trigger a notification event                                  | Email/notification received              | [P2]       | [ ] Pass/Fail |
-| 8 | Background Job Processing            | Trigger or wait for scheduled job                             | Job completes successfully               | [P2]       | [ ] Pass/Fail |
-| 9 | [BUSINESS FLOW]                      | [STEPS]                                                       | [EXPECTED]                              | [PRIORITY] | [ ] Pass/Fail |
+| 1 | User Login                            | Log in with valid test credentials                            | Dashboard loads, session created         | P1         | [ ] Pass/Fail |
+| 2 | View Assessments List                 | Navigate to assessments page                                   | Assessments list renders with data      | P1         | [ ] Pass/Fail |
+| 3 | Create/Open Assessment                | Create a new assessment or open existing                       | Assessment form/view loads              | P1         | [ ] Pass/Fail |
+| 4 | Save Assessment Data                  | Make a change to an assessment and save                        | Data saves successfully, confirmation shown | P1     | [ ] Pass/Fail |
+| 5 | Generate Report                       | Generate a compliance report for an assessment                 | Report generates and downloads          | P2         | [ ] Pass/Fail |
+| 6 | User Logout                           | Log out of the application                                     | Redirected to login page                 | P2         | [ ] Pass/Fail |
 
-### 6.2 Regression Test Suite (if applicable)
+### 6.2 Regression Test Suite
+
+**Status: NOT IMPLEMENTED** -- No automated regression test suite exists.
 
 | Attribute                  | Value                                              |
 |----------------------------|----------------------------------------------------|
-| Test Suite Tool            | [Selenium / Cypress / Playwright / Postman]        |
-| Execution Command          | `[COMMAND TO RUN REGRESSION TESTS]`                |
-| Test Suite Location        | [https://github.com/ORG/REPO/tests/regression]    |
-| Expected Duration          | [15-30 minutes]                                    |
-| Pass Criteria              | [>95% pass rate, all P1 tests pass]               |
-| Results Dashboard          | [URL TO TEST RESULTS]                              |
+| Test Suite Tool            | NOT IMPLEMENTED                                    |
+| Execution Command          | N/A                                                |
+| Expected Duration          | N/A                                                |
+| Pass Criteria              | N/A                                                |
+
+### Planned Improvements
+
+- Create automated end-to-end tests using Playwright or Cypress
+- Run regression tests as part of the CD pipeline before production deployment
+- Define pass criteria (100% P1 tests pass, >95% overall)
 
 ---
 
 ## 7. Phase 5: Performance Baseline Comparison
 
-### 7.1 Pre vs. Post Deployment Metrics
+**Status: NOT IMPLEMENTED** -- No Application Insights or APM is deployed. Performance baseline comparison is not possible.
 
-| Metric                          | Source              | Pre-Deployment Baseline | Post-Deployment Value | Acceptable Variance | Status       |
-|---------------------------------|---------------------|-------------------------|-----------------------|---------------------|--------------|
-| Request Rate (req/s)            | App Insights        | [XXX req/s]             | [XXX req/s]           | [+/- 20%]           | [ ] Pass/Fail |
-| Response Time P50 (ms)          | App Insights        | [XXX ms]                | [XXX ms]              | [+/- 20%]           | [ ] Pass/Fail |
-| Response Time P95 (ms)          | App Insights        | [XXX ms]                | [XXX ms]              | [+/- 30%]           | [ ] Pass/Fail |
-| Response Time P99 (ms)          | App Insights        | [XXX ms]                | [XXX ms]              | [+/- 50%]           | [ ] Pass/Fail |
-| Error Rate (%)                  | App Insights        | [X.XX%]                 | [X.XX%]               | [No increase]       | [ ] Pass/Fail |
-| CPU Utilization (%)             | Azure Monitor       | [XX%]                   | [XX%]                 | [+/- 15%]           | [ ] Pass/Fail |
-| Memory Utilization (%)          | Azure Monitor       | [XX%]                   | [XX%]                 | [+/- 15%]           | [ ] Pass/Fail |
-| SQL DTU/vCore Utilization (%)   | Azure Monitor       | [XX%]                   | [XX%]                 | [+/- 20%]           | [ ] Pass/Fail |
-| Redis Cache Hit Rate (%)        | Azure Monitor       | [XX%]                   | [XX%]                 | [No decrease >5%]   | [ ] Pass/Fail |
-| Service Bus Queue Length         | Azure Monitor       | [XXX messages]          | [XXX messages]        | [No growing backlog]| [ ] Pass/Fail |
+> **Current State:** Performance can only be observed through Azure Monitor platform metrics (CPU, memory) and manual response time checks. There is no automated comparison of pre vs. post deployment metrics.
 
-### 7.2 Performance Comparison Method
+### Manual Performance Check
 
-```kql
-// Compare response times: 1 hour before vs 1 hour after deployment
-let deployTime = datetime([YYYY-MM-DDTHH:MM:SSZ]);
-let preStart = deployTime - 1h;
-let postStart = deployTime + 15m;  // Allow 15 min warm-up
-let postEnd = postStart + 1h;
-requests
-| where timestamp between (preStart .. deployTime) or timestamp between (postStart .. postEnd)
-| extend Period = iff(timestamp < deployTime, "Pre-Deploy", "Post-Deploy")
-| summarize
-    count(),
-    avg(duration),
-    percentile(duration, 50),
-    percentile(duration, 95),
-    percentile(duration, 99),
-    countif(toint(resultCode) >= 500)
-    by Period
-```
+| Check                          | Method                                          | Expected                     | Status       |
+|--------------------------------|-------------------------------------------------|------------------------------|--------------|
+| API response time feels normal | Manually test key endpoints                     | Responses feel comparable    | [ ] Pass/Fail |
+| Frontend load time normal      | Load frontend in browser                        | Page loads in <5 seconds     | [ ] Pass/Fail |
+
+### Planned Improvements
+
+- Deploy Application Insights to enable request-level metrics
+- Create a pre vs. post deployment comparison KQL query
+- Define acceptable performance variance thresholds
 
 ---
 
@@ -231,16 +193,12 @@ requests
 
 | # | Check                                         | Method                                                  | Expected Result                    | Status       |
 |---|-----------------------------------------------|---------------------------------------------------------|------------------------------------|--------------|
-| 1 | SSL/TLS certificate valid                     | `curl -vI https://[APP_URL] 2>&1 \| grep "expire"`     | Not expired, >30 days remaining   | [ ] Pass/Fail |
-| 2 | TLS version >= 1.2                            | `nmap --script ssl-enum-ciphers -p 443 [DOMAIN]`       | Only TLS 1.2+ accepted            | [ ] Pass/Fail |
-| 3 | WAF active and in Prevention mode             | Azure Portal > Application Gateway > WAF                | WAF mode = Prevention              | [ ] Pass/Fail |
-| 4 | HTTPS redirect working                        | `curl -I http://[APP_URL]`                              | 301 redirect to HTTPS              | [ ] Pass/Fail |
-| 5 | Security headers present                      | `curl -I https://[APP_URL]`                             | X-Frame-Options, CSP, HSTS present| [ ] Pass/Fail |
-| 6 | Private endpoints active                      | Azure Portal > Private Endpoint connections              | All endpoints in Approved state   | [ ] Pass/Fail |
-| 7 | Key Vault accessible                          | Application can read secrets at startup                  | Secrets retrieved successfully     | [ ] Pass/Fail |
-| 8 | Managed Identity working                      | Check App Insights for auth failures to Azure services  | No managed identity failures       | [ ] Pass/Fail |
-| 9 | No public access to databases                 | Verify SQL firewall rules / private endpoint only       | No public IP access                | [ ] Pass/Fail |
-| 10| [SECURITY CHECK]                              | [METHOD]                                                | [EXPECTED RESULT]                  | [ ] Pass/Fail |
+| 1 | HTTPS working on frontend                     | `curl -I https://cmmc.intellisecops.com`                | HTTP 200, HTTPS connection valid   | [ ] Pass/Fail |
+| 2 | HTTPS working on API                           | `curl -I https://api.cmmc.intellisecops.com`            | HTTP 200, HTTPS connection valid   | [ ] Pass/Fail |
+| 3 | TLS certificate valid                          | Browser check or `curl -vI https://cmmc.intellisecops.com 2>&1 \| grep "expire"` | Not expired | [ ] Pass/Fail |
+| 4 | Key Vault accessible by application            | Health endpoint returns successfully (secrets loaded)   | Health check passes                | [ ] Pass/Fail |
+
+> **Note:** WAF verification, private endpoint verification, and managed identity checks are N/A because these features are NOT IMPLEMENTED.
 
 ---
 
@@ -248,103 +206,76 @@ requests
 
 | # | Check                                         | Method                                                    | Expected Result                  | Status       |
 |---|-----------------------------------------------|-----------------------------------------------------------|----------------------------------|--------------|
-| 1 | Database migrations applied successfully      | Check migration history table                             | Latest migration ID matches expected | [ ] Pass/Fail |
-| 2 | No pending migrations                         | `dotnet ef migrations list` or migration tool check       | All migrations applied           | [ ] Pass/Fail |
-| 3 | Database schema matches expected state         | Run schema comparison or spot-check key tables            | Schema matches version           | [ ] Pass/Fail |
-| 4 | Data integrity check                          | Run validation queries for key data relationships         | No orphaned records, FK valid    | [ ] Pass/Fail |
-| 5 | Seed data / reference data present            | Query reference data tables                               | Required reference data exists   | [ ] Pass/Fail |
-| 6 | Backfill jobs completed (if applicable)       | Check backfill job status                                 | Job completed successfully       | [ ] Pass/Fail |
-| 7 | Storage account accessible                    | Upload/download test blob                                 | Operations succeed               | [ ] Pass/Fail |
-| 8 | Redis cache populated (if pre-warmed)         | Check cache key count / hit rate                          | Cache warming complete           | [ ] Pass/Fail |
-| 9 | [DATA CHECK]                                  | [METHOD]                                                  | [EXPECTED]                       | [ ] Pass/Fail |
+| 1 | Prisma migrations applied successfully        | Application starts without migration errors (check logs)  | No migration errors in logs      | [ ] Pass/Fail |
+| 2 | Database connectivity confirmed               | Health endpoint returns successfully                       | Health check passes              | [ ] Pass/Fail |
+| 3 | Existing data accessible                      | Load an existing assessment in the UI                      | Data displays correctly          | [ ] Pass/Fail |
 
 ---
 
-## 10. Phase 8: Integration Verification
+## 10. Phase 8: Final Sign-Off
 
-| # | Integration                          | Verification Method                                     | Expected Result                         | Status       |
-|---|--------------------------------------|---------------------------------------------------------|-----------------------------------------|--------------|
-| 1 | [Payment Provider API]               | Process test transaction in sandbox/live                | Transaction succeeds                     | [ ] Pass/Fail |
-| 2 | [Email Service Provider]             | Trigger test email, verify delivery                     | Email received within 60 seconds         | [ ] Pass/Fail |
-| 3 | [SSO / Identity Provider]            | Perform SSO login flow                                  | SSO authentication succeeds              | [ ] Pass/Fail |
-| 4 | [CDN / Static Assets]                | Verify static assets served from CDN                    | Assets load from CDN endpoint            | [ ] Pass/Fail |
-| 5 | [Service Bus / Queue Consumer]       | Publish test message, verify consumption                | Message consumed and processed           | [ ] Pass/Fail |
-| 6 | [Third-Party API]                    | Call dependent API endpoint                             | Successful response received             | [ ] Pass/Fail |
-| 7 | [Internal Microservice Dependency]   | Call internal service health endpoint                   | Service healthy and responding           | [ ] Pass/Fail |
-| 8 | [Webhook Endpoints]                  | Trigger test webhook event                              | Webhook received and processed           | [ ] Pass/Fail |
-| 9 | [INTEGRATION]                        | [METHOD]                                                | [EXPECTED]                               | [ ] Pass/Fail |
+### 10.1 Sign-Off Table
 
----
-
-## 11. Phase 9: Final Sign-Off
-
-### 11.1 Sign-Off Table
-
-| Verifier           | Area                        | Status         | Notes                        | Timestamp        |
-|--------------------|-----------------------------|----------------|------------------------------|------------------|
+| Verifier           | Area                        | Status         | Notes                        | Timestamp              |
+|--------------------|-----------------------------|----------------|------------------------------|------------------------|
 | [NAME]             | Smoke Tests (Phase 1)       | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
 | [NAME]             | Health Checks (Phase 2)     | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
 | [NAME]             | Monitoring (Phase 3)        | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
 | [NAME]             | Functional (Phase 4)        | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
-| [NAME]             | Performance (Phase 5)       | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
 | [NAME]             | Security (Phase 6)          | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
 | [NAME]             | Data (Phase 7)              | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
-| [NAME]             | Integrations (Phase 8)      | [Pass / Fail]  | [NOTES OR "All clear"]       | [YYYY-MM-DD HH:MM UTC] |
-| **[RELEASE MGR]**  | **OVERALL SIGN-OFF**        | **[Pass/Fail]** | **[FINAL NOTES]**           | **[TIMESTAMP]**  |
+| **[ENGINEER]**     | **OVERALL SIGN-OFF**        | **[Pass/Fail]** | **[FINAL NOTES]**           | **[TIMESTAMP]**        |
 
-### 11.2 Criteria for Declaring Deployment Successful
+> **Note:** Currently only the deploying engineer performs verification. There is no separate QA or SRE sign-off.
+
+### 10.2 Criteria for Declaring Deployment Successful
 
 All of the following must be true:
 
-- [ ] All Phase 1 (Smoke Test) checks pass
-- [ ] All Phase 2 (Health Check) endpoints return healthy
-- [ ] Phase 3 (Monitoring) confirms metrics and logs flowing normally
-- [ ] All P1 functional tests pass (Phase 4); any P2 failures have documented workarounds
-- [ ] Phase 5 (Performance) metrics are within acceptable variance of baseline
-- [ ] Phase 6 (Security) verifications pass -- no new vulnerabilities introduced
-- [ ] Phase 7 (Data) migrations applied, integrity checks pass
-- [ ] Phase 8 (Integration) downstream systems responding correctly
-- [ ] No new critical or major alerts firing for at least 60 minutes post-deployment
-- [ ] Release Manager has provided final sign-off
+- [ ] API health check endpoint returns 200 OK
+- [ ] Frontend loads successfully in browser
+- [ ] User login works
+- [ ] Container App revisions are active and running
+- [ ] No new error spikes in Log Analytics
+- [ ] Prisma migrations applied without errors
+- [ ] Core assessment workflow functional (at least view and save)
+- [ ] No new critical errors for at least 30 minutes post-deployment
 
-### 11.3 Deployment Declaration
+### 10.3 Deployment Declaration
 
 | Attribute              | Value                                          |
 |------------------------|------------------------------------------------|
 | Deployment Status      | [SUCCESSFUL / FAILED / ROLLED BACK]            |
-| Deployment Version     | [VERSION NUMBER]                               |
+| Deployment Version     | [IMAGE TAG or COMMIT SHA]                      |
 | Declared At            | [YYYY-MM-DD HH:MM UTC]                        |
-| Declared By            | [RELEASE MANAGER NAME]                         |
+| Declared By            | [ENGINEER NAME]                                |
 | Known Issues (if any)  | [LIST OR "None"]                               |
-| Monitoring Extension   | [Extended monitoring for XX hours if needed]   |
+| Monitoring Extension   | [Extended monitoring if any concerns noted]    |
 
 ---
 
-## 12. Appendix: Verification Scripts
-
-### Quick Verification Script (All Health Checks)
+## 11. Appendix: Quick Verification Script
 
 ```bash
 #!/bin/bash
-# Post-deployment health check script
-# Usage: ./verify-deployment.sh [ENVIRONMENT]
+# Post-deployment verification script for CMMC Assessor Platform
+# Usage: ./verify-deployment.sh
 
-ENVIRONMENT=${1:-production}
 FAILED=0
 
-echo "=== Post-Deployment Verification: $ENVIRONMENT ==="
+echo "=== CMMC Assessor Platform Post-Deployment Verification ==="
+echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo ""
 
 # Health checks
 echo "--- Health Checks ---"
 endpoints=(
-  "https://[APP_URL]/health"
-  "https://[API_URL]/health"
-  "https://[API_URL]/health/ready"
-  "https://[FUNC_URL]/api/health"
+  "https://api.cmmc.intellisecops.com/api/health"
+  "https://cmmc.intellisecops.com"
 )
 
 for url in "${endpoints[@]}"; do
-  status=$(curl -s -o /dev/null -w "%{http_code}" "$url" --max-time 10)
+  status=$(curl -s -o /dev/null -w "%{http_code}" "$url" --max-time 15)
   if [ "$status" = "200" ]; then
     echo "PASS: $url (HTTP $status)"
   else
@@ -353,19 +284,36 @@ for url in "${endpoints[@]}"; do
   fi
 done
 
-# Version check
-echo "--- Version Check ---"
-version=$(curl -s "https://[API_URL]/health" | jq -r '.version')
-echo "Deployed version: $version"
-echo "Expected version: [EXPECTED_VERSION]"
+# TLS check
+echo ""
+echo "--- TLS Check ---"
+tls_status=$(curl -s -o /dev/null -w "%{ssl_verify_result}" "https://api.cmmc.intellisecops.com" --max-time 10)
+if [ "$tls_status" = "0" ]; then
+  echo "PASS: TLS certificate valid"
+else
+  echo "FAIL: TLS certificate issue (verify result: $tls_status)"
+  FAILED=$((FAILED + 1))
+fi
+
+# Container App revision check
+echo ""
+echo "--- Container App Revisions ---"
+echo "Backend API:"
+az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod --query "[0].{name:name, active:properties.active, running:properties.runningState}" -o table 2>/dev/null || echo "WARN: Could not check Container App revision (az CLI not configured)"
+echo ""
+echo "Frontend:"
+az containerapp revision list --name cmmc-web --resource-group rg-cmmc-assessor-prod --query "[0].{name:name, active:properties.active, running:properties.runningState}" -o table 2>/dev/null || echo "WARN: Could not check Container App revision (az CLI not configured)"
 
 # Summary
+echo ""
 echo "=== Summary ==="
 if [ $FAILED -eq 0 ]; then
   echo "ALL CHECKS PASSED"
+  echo "Deployment can be declared SUCCESSFUL"
 else
   echo "FAILED CHECKS: $FAILED"
   echo "ACTION REQUIRED: Review failed checks and consider rollback"
+  echo "See: rollback-procedures.md for rollback instructions"
 fi
 
 exit $FAILED
@@ -373,9 +321,8 @@ exit $FAILED
 
 ---
 
-## 13. Revision History
+## 12. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |

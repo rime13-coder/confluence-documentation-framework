@@ -1,38 +1,38 @@
 # Project Charter
 
-| **Page Title**   | [PROJECT_NAME] - Project Charter |
-|------------------|----------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                     |
-| **Status**       | NOT STARTED                      |
-| **Owner**        | [OWNER_NAME]                     |
+| **Page Title**   | CMMC Assessor Platform - Project Charter |
+|------------------|------------------------------------------|
+| **Last Updated** | 2026-02-14                               |
+| **Status**       | IN PROGRESS                              |
+| **Owner**        | IntelliSec Solutions                     |
 
 ---
 
 ## 1. Project Identity
 
-| Field                | Value                                      |
-|----------------------|--------------------------------------------|
-| **Project Name**     | [PROJECT_NAME]                             |
-| **Project Code**     | [PROJECT_CODE]                             |
-| **Project Sponsor**  | [SPONSOR_NAME, TITLE]                      |
-| **Project Manager**  | [PM_NAME, TITLE]                           |
-| **Department**       | [DEPARTMENT]                               |
-| **Start Date**       | [YYYY-MM-DD]                               |
-| **Target End Date**  | [YYYY-MM-DD]                               |
-| **Azure Subscription** | [SUBSCRIPTION_NAME / ID]                 |
-| **GitHub Repository** | [ORG/REPO_NAME]                           |
+| Field                | Value                                                        |
+|----------------------|--------------------------------------------------------------|
+| **Project Name**     | CMMC Assessor Platform                                       |
+| **Project Code**     | CMMC-AP                                                      |
+| **Project Sponsor**  | IntelliSec Solutions (brand: CloudSecOps)                    |
+| **Project Manager**  | Lead Developer / Architect, IntelliSec Solutions             |
+| **Department**       | Product Engineering                                          |
+| **Start Date**       | 2025-01-01                                                   |
+| **Target End Date**  | 2026-06-30                                                   |
+| **Azure Subscription** | IntelliSec Solutions - Canada Central                      |
+| **GitHub Repository** | rime13-coder/CMMCAccessor (private)                         |
 
 ---
 
 ## 2. Project Description
 
-[Provide a concise description of the project in 2-4 sentences. What is being built, for whom, and on what platform.]
+The CMMC Assessor Platform is a comprehensive multi-tenant SaaS application that enables Defense Industrial Base (DIB) organizations to perform self-assessments against CMMC Level 2 requirements. Built on React 18, Node.js 20, Express, and PostgreSQL 17, the platform covers all 110 CMMC Level 2 practices across 14 security domains with 255 individual assessment objectives. It provides SPRS score calculation, POA&M generation, SSP document generation, policy management, evidence management via SharePoint integration, and full team collaboration -- all hosted on Azure Container Apps in the Canada Central region.
 
 ---
 
 ## 3. Vision Statement
 
-[One or two sentences describing the desired future state once the project is delivered. Keep it aspirational but grounded.]
+To provide the most affordable, comprehensive, and intuitive CMMC Level 2 self-assessment platform for Defense Industrial Base small and medium-sized businesses, democratizing cybersecurity compliance so that every organization -- regardless of size or budget -- can confidently prepare for CMMC certification and continue competing for Department of Defense contracts.
 
 ---
 
@@ -40,18 +40,18 @@
 
 ### Problem Statement
 
-[Describe the business problem or opportunity this project addresses. Be specific about the pain points, inefficiencies, or gaps in current capabilities.]
+Defense Industrial Base organizations, particularly small and medium-sized businesses, face a critical challenge: they must achieve CMMC Level 2 certification to win or retain Department of Defense contracts under DFARS 252.204-7021, yet existing Governance, Risk, and Compliance (GRC) tools are prohibitively expensive (often $50,000-$200,000+ annually), overly complex, and designed for large enterprises. Without an affordable path to compliance, SMBs risk losing their ability to participate in the defense supply chain. The CMMC 2.0 framework requires organizations to demonstrate compliance with 110 practices derived from NIST SP 800-171, a process that demands structured assessment, evidence collection, remediation tracking, and formal documentation -- capabilities that manual spreadsheets and ad hoc processes cannot reliably deliver.
 
 ### Business Justification
 
-[Explain why this project should be funded and prioritized. Reference strategic alignment, revenue impact, cost savings, regulatory compliance, or competitive advantage as applicable.]
+This project addresses a clear market gap by providing an affordable, purpose-built CMMC Level 2 self-assessment tool at roughly 1/10th the cost of enterprise GRC platforms. With monthly Azure infrastructure costs of approximately $35-70 CAD for the MVP, the platform can be offered at price points accessible to DIB SMBs while maintaining healthy margins.
 
-| Justification Category | Details                  |
-|------------------------|--------------------------|
-| Strategic Alignment    | [STRATEGIC_GOAL]         |
-| Expected ROI           | [ROI_ESTIMATE]           |
-| Cost of Inaction       | [RISK_IF_NOT_PURSUED]    |
-| Regulatory Requirement | [REGULATION_IF_ANY]      |
+| Justification Category | Details                                                                                  |
+|------------------------|------------------------------------------------------------------------------------------|
+| Strategic Alignment    | Position IntelliSec Solutions as a leader in affordable CMMC compliance tooling for SMBs |
+| Expected ROI           | SaaS recurring revenue from DIB SMBs; estimated 100+ target organizations in first year  |
+| Cost of Inaction       | DIB SMBs lose DoD contracts; IntelliSec misses first-mover advantage in underserved segment |
+| Regulatory Requirement | CMMC 2.0 (DFARS 252.204-7021), NIST SP 800-171 Rev 2                                    |
 
 ---
 
@@ -61,10 +61,11 @@ Each objective must be measurable. Define KPIs that can be tracked post-delivery
 
 | # | Objective | KPI | Baseline | Target | Measurement Method |
 |---|-----------|-----|----------|--------|--------------------|
-| 1 | [OBJECTIVE_1] | [KPI_1] | [CURRENT_VALUE] | [TARGET_VALUE] | [HOW_MEASURED] |
-| 2 | [OBJECTIVE_2] | [KPI_2] | [CURRENT_VALUE] | [TARGET_VALUE] | [HOW_MEASURED] |
-| 3 | [OBJECTIVE_3] | [KPI_3] | [CURRENT_VALUE] | [TARGET_VALUE] | [HOW_MEASURED] |
-| 4 | [OBJECTIVE_4] | [KPI_4] | [CURRENT_VALUE] | [TARGET_VALUE] | [HOW_MEASURED] |
+| 1 | Launch MVP with full CMMC Level 2 assessment capability | Feature completeness (110 practices, 255 objectives, SPRS, POA&M, SSP) | 0% | 100% | Feature audit against CMMC Level 2 practice list |
+| 2 | Onboard first 10 paying client organizations | Active tenant count | 0 | 10 | Tenant table count with active subscriptions |
+| 3 | Achieve 80% feature parity with enterprise GRC tools at 1/10th the cost | Feature comparison matrix score vs. top 3 competitors | 0% | 80% | Competitive feature matrix analysis |
+| 4 | Remediate all critical and high-severity security findings | Open critical/high findings count | 47 total findings | 0 critical/high open | Security review tracking dashboard |
+| 5 | Maintain monthly Azure infrastructure cost under $100 CAD for MVP | Monthly Azure spend | $0 | < $100 CAD/month | Azure Cost Management reporting |
 
 ---
 
@@ -72,21 +73,38 @@ Each objective must be measurable. Define KPIs that can be tracked post-delivery
 
 ### In-Scope
 
-- [IN_SCOPE_ITEM_1]
-- [IN_SCOPE_ITEM_2]
-- [IN_SCOPE_ITEM_3]
-- [IN_SCOPE_ITEM_4]
+- Complete CMMC Level 2 control library (110 practices, 255 objectives across 14 security domains)
+- Objective-level assessment workflow based on NIST SP 800-171A examination methods
+- SPRS Score Calculator (scoring range: -203 to 110)
+- POA&M Generator with risk-based scheduling and evidence management
+- SSP Generation in DOCX format following NIST SP 800-171 structure
+- Policy library with 14 domain-specific templates, version history, and user acknowledgments
+- Evidence management via SharePoint integration (Microsoft Graph API with AES-256-GCM token encryption)
+- Multi-tenant architecture with Microsoft Entra ID SSO (OAuth 2.0 / OIDC)
+- Publisher/Client tenant model with platform roles (SUPER_ADMIN, SUPPORT, USER) and team roles (OWNER, ADMIN, ASSESSOR, MEMBER, VIEWER)
+- Comprehensive audit trail for all assessment and administrative actions
+- Excel export for assessment data
+- Dashboard with compliance metrics and visualizations (Recharts)
+- CI/CD pipeline via GitHub Actions with OIDC authentication to Azure
+- Infrastructure as Code using Bicep for Azure Container Apps, Container Registry, Key Vault, Blob Storage, and PostgreSQL
 
 ### Out-of-Scope
 
-- [OUT_OF_SCOPE_ITEM_1]
-- [OUT_OF_SCOPE_ITEM_2]
-- [OUT_OF_SCOPE_ITEM_3]
+- CMMC Level 3 (NIST SP 800-172 requirements) -- future phase
+- C3PAO assessment mode (third-party assessor workflows) -- future phase
+- Continuous monitoring and automated evidence collection -- future phase
+- FedRAMP or StateRAMP compliance modules
+- Mobile-native applications (iOS/Android)
+- Multi-region deployment or active-active disaster recovery (MVP is single-region, Canada Central)
 
-### [OPTIONAL] Future Scope (Planned for Later Phases)
+### Future Scope (Planned for Later Phases)
 
-- [FUTURE_ITEM_1]
-- [FUTURE_ITEM_2]
+- CMMC Level 3 assessment support
+- C3PAO integration for formal assessment coordination
+- Continuous monitoring with automated control validation
+- Advanced analytics and benchmarking across anonymized tenant data
+- API marketplace for third-party security tool integrations
+- Multi-region deployment with Azure Traffic Manager for high availability
 
 ---
 
@@ -96,37 +114,38 @@ Each objective must be measurable. Define KPIs that can be tracked post-delivery
 
 | # | Assumption | Impact if Invalid |
 |---|------------|-------------------|
-| 1 | [ASSUMPTION_1] | [IMPACT_1] |
-| 2 | [ASSUMPTION_2] | [IMPACT_2] |
-| 3 | [ASSUMPTION_3] | [IMPACT_3] |
-| 4 | Azure resource quotas are sufficient for planned workloads | Deployment delays; quota increase requests needed |
-| 5 | GitHub Actions runners (GitHub-hosted or self-hosted) are available and configured | CI/CD pipeline failures; blocked deployments |
+| 1 | CMMC 2.0 rulemaking will proceed as planned and Level 2 requirements will remain based on NIST SP 800-171 Rev 2 | Significant rework of control library, assessment logic, and all generated documents (SSP, POA&M) |
+| 2 | DIB SMBs are willing to adopt a SaaS-based compliance tool rather than on-premises or spreadsheet-based approaches | Reduced market adoption; may need to offer hybrid deployment options |
+| 3 | Microsoft Entra ID is the primary identity provider for target customers (DIB organizations using Microsoft 365) | Need to support additional identity providers (Okta, Google Workspace), increasing development scope |
+| 4 | Azure Burstable B1ms tier for PostgreSQL is sufficient for initial workload (up to ~50 concurrent users) | Database performance degradation; need to scale to higher compute tier, increasing costs |
+| 5 | Azure Container Apps provides sufficient compute and scaling for the MVP workload | Migration to AKS or alternative compute; increased operational complexity and cost |
 
 ### Constraints
 
 | # | Constraint | Type |
 |---|------------|------|
-| 1 | [CONSTRAINT_1] | Budget / Time / Technical / Regulatory |
-| 2 | [CONSTRAINT_2] | Budget / Time / Technical / Regulatory |
+| 1 | Small development team (founder-led); limited parallelism in feature development | Resource |
+| 2 | Monthly Azure infrastructure budget capped at approximately $35-70 CAD for MVP | Budget |
 | 3 | All deployments must go through GitHub Actions CI/CD pipelines (no manual Azure deployments) | Process |
-| 4 | Must comply with [SECURITY_FRAMEWORK] and pass Architecture Review Board (ARB) | Regulatory / Governance |
-| 5 | [CONSTRAINT_5] | [TYPE] |
+| 4 | Must align with CMMC 2.0 / NIST SP 800-171 Rev 2 requirements and pass security review | Regulatory / Governance |
+| 5 | Platform handles CUI-adjacent data; must implement appropriate security controls even though the platform itself is not a CUI repository | Security |
+| 6 | CMMC ecosystem and rulemaking are still evolving; platform must be adaptable to regulatory changes | Regulatory |
+| 7 | Single-region deployment (Canada Central) for MVP; no disaster recovery infrastructure initially | Technical |
 
 ---
 
 ## 8. Budget Summary
 
-[OPTIONAL] Include this section if budget tracking is managed at the project level.
-
 | Category | Estimated Cost | Approved Budget | Notes |
 |----------|---------------|-----------------|-------|
-| Azure Infrastructure (monthly) | [AMOUNT] | [AMOUNT] | [RESOURCE_TYPES] |
-| Azure Infrastructure (total project) | [AMOUNT] | [AMOUNT] | |
-| Licensing / Third-Party Services | [AMOUNT] | [AMOUNT] | [TOOLS_OR_SERVICES] |
-| Personnel (internal FTEs) | [AMOUNT] | [AMOUNT] | [HEADCOUNT] |
-| Personnel (contractors / vendors) | [AMOUNT] | [AMOUNT] | [VENDOR_NAME] |
-| Contingency ([PERCENT]%) | [AMOUNT] | [AMOUNT] | |
-| **Total** | **[TOTAL]** | **[TOTAL]** | |
+| Azure Infrastructure (monthly) | $35-70 CAD | $100 CAD | Container Apps, PostgreSQL Flexible Server (B1ms), Container Registry (Basic), Key Vault, Blob Storage |
+| Azure Infrastructure (annual, first year) | $420-840 CAD | $1,200 CAD | Canada Central region |
+| Licensing / Third-Party Services | $0 | $0 | Open-source stack (React, Node.js, Express, Prisma, PostgreSQL); GitHub free tier for private repo |
+| Domain & DNS | ~$30 CAD/year | $50 CAD | cmmc.intellisecops.com, api.cmmc.intellisecops.com |
+| Personnel (internal) | Founder time | N/A | Founder-led development; no external FTEs in MVP phase |
+| Personnel (contractors / vendors) | TBD | TBD | Security review, penetration testing |
+| Contingency (20%) | ~$250 CAD | $250 CAD | Infrastructure scaling, unexpected service costs |
+| **Total (Year 1)** | **~$700-1,120 CAD** | **~$1,500 CAD** | |
 
 ---
 
@@ -134,20 +153,19 @@ Each objective must be measurable. Define KPIs that can be tracked post-delivery
 
 | # | Milestone | Description | Target Date | Status | Dependencies |
 |---|-----------|-------------|-------------|--------|--------------|
-| 1 | Project Kickoff | Team onboarded, charter approved | [YYYY-MM-DD] | NOT STARTED | Charter sign-off |
-| 2 | Architecture Design Complete | ARB review passed, Azure resources defined | [YYYY-MM-DD] | NOT STARTED | Requirements finalized |
-| 3 | CI/CD Pipeline Established | GitHub Actions workflows operational for all environments | [YYYY-MM-DD] | NOT STARTED | Repo and Azure service connections configured |
-| 4 | Development Complete (MVP) | Core features implemented, unit tests passing | [YYYY-MM-DD] | NOT STARTED | Architecture approved |
-| 5 | Security Review Passed | SAST/DAST scans clean, penetration test complete | [YYYY-MM-DD] | NOT STARTED | Development complete |
-| 6 | UAT Sign-Off | Business stakeholders approve user acceptance testing | [YYYY-MM-DD] | NOT STARTED | QA complete |
-| 7 | Production Go-Live | Deployment to Azure production environment | [YYYY-MM-DD] | NOT STARTED | All approvals obtained |
-| 8 | Hypercare Complete | Post-go-live support period ends, handoff to operations | [YYYY-MM-DD] | NOT STARTED | Go-live stable |
+| 1 | Project Kickoff | Repository created, initial architecture defined, Azure resources provisioned | 2025-01-15 | COMPLETE | Founder commitment |
+| 2 | MVP Development Complete | All 110 practices, 255 objectives, SPRS calculator, POA&M, SSP generation, policy management, multi-tenancy, Entra ID auth | 2025-09-30 | COMPLETE | Architecture decisions finalized |
+| 3 | CI/CD Pipeline Established | GitHub Actions workflows for build, test, and deploy to Azure Container Apps via OIDC | 2025-10-15 | COMPLETE | Azure service connections, Bicep IaC |
+| 4 | Security Review (Phase 0) | Initial security assessment; identify and triage all findings | 2025-12-15 | COMPLETE | MVP feature-complete |
+| 5 | Security Remediation (Phase 1-3) | Address 47 identified security findings across critical, high, medium, and low severity | 2026-03-31 | IN PROGRESS | Security review findings documented |
+| 6 | Staging Environment | Dedicated staging environment for pre-production validation | 2026-04-15 | NOT STARTED | Phase 1-2 security remediation complete |
+| 7 | Penetration Testing | External penetration test against staging environment | 2026-05-15 | NOT STARTED | Staging environment operational, critical findings remediated |
+| 8 | First Client Onboarding | First paying tenant organization onboarded and actively using the platform | 2026-06-01 | NOT STARTED | Penetration test passed, production hardened |
+| 9 | Production Go-Live (GA) | General availability; marketing launch | 2026-06-30 | NOT STARTED | Client onboarding validated, all critical/high findings resolved |
 
 ---
 
 ## 10. Key Risks
-
-Identify the top 5 risks. Use the scoring guide below.
 
 **Likelihood:** Low (1) / Medium (2) / High (3)
 **Impact:** Low (1) / Medium (2) / High (3)
@@ -155,11 +173,11 @@ Identify the top 5 risks. Use the scoring guide below.
 
 | # | Risk Description | Likelihood | Impact | Score | Mitigation Strategy | Owner |
 |---|------------------|------------|--------|-------|---------------------|-------|
-| 1 | [RISK_1] | [L/M/H] | [L/M/H] | [1-9] | [MITIGATION_1] | [OWNER] |
-| 2 | [RISK_2] | [L/M/H] | [L/M/H] | [1-9] | [MITIGATION_2] | [OWNER] |
-| 3 | Azure service outage impacts production availability | Medium | High | 6 | Multi-region deployment strategy; define RTO/RPO; configure Azure availability zones | [OWNER] |
-| 4 | CI/CD pipeline failures block releases | Medium | Medium | 4 | Implement pipeline monitoring/alerting; maintain rollback workflows in GitHub Actions | [OWNER] |
-| 5 | Key personnel unavailable (single points of failure) | Medium | High | 6 | Cross-train team members; document all processes; maintain runbooks | [OWNER] |
+| 1 | 47 security findings identified in review, including critical items (e.g., missing rate limiting, unvalidated input, secrets in code) could delay launch or cause a breach | High | High | 9 | Phased remediation plan (Phase 0-3); prioritize critical/high findings; track progress in security remediation backlog | Lead Developer |
+| 2 | Single-region deployment (Canada Central) with no disaster recovery; Azure outage causes total platform unavailability | Medium | High | 6 | Implement database backups; document RTO/RPO; plan multi-region expansion for post-MVP phase | Lead Developer |
+| 3 | CMMC 2.0 rulemaking changes or NIST SP 800-171 Rev 3 adoption invalidates current control library and assessment logic | Medium | High | 6 | Design flexible control/objective data model; monitor CMMC-AB announcements; plan for quarterly control library updates | Platform Owner |
+| 4 | Key personnel dependency (single founder/developer); unavailability halts all progress | High | High | 9 | Document all architecture decisions, runbooks, and deployment procedures; maintain comprehensive IaC; consider bringing on a second developer | Platform Owner |
+| 5 | Market adoption slower than expected; DIB SMBs may prefer established GRC vendors or manual processes | Medium | Medium | 4 | Competitive pricing strategy; free trial period; build partnerships with CMMC consultants and C3PAOs for referrals | Platform Owner |
 
 ---
 
@@ -169,12 +187,9 @@ This charter is approved by the following stakeholders. Approval indicates agree
 
 | Name | Role | Date | Signature |
 |------|------|------|-----------|
-| [SPONSOR_NAME] | Executive Sponsor | [YYYY-MM-DD] | |
-| [PM_NAME] | Project Manager | [YYYY-MM-DD] | |
-| [ARCH_NAME] | Lead Architect | [YYYY-MM-DD] | |
-| [SECURITY_NAME] | Security Lead | [YYYY-MM-DD] | |
-| [BIZ_NAME] | Business Owner | [YYYY-MM-DD] | |
-| [DEVOPS_NAME] | DevOps / Platform Lead | [YYYY-MM-DD] | |
+| IntelliSec Solutions Founder | Platform Owner / Executive Sponsor | 2026-02-14 | |
+| Lead Developer | Lead Architect / Project Manager | 2026-02-14 | |
+| Security Reviewer | Security Lead | | |
 
 ---
 
@@ -182,4 +197,4 @@ This charter is approved by the following stakeholders. Approval indicates agree
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 0.1 | [YYYY-MM-DD] | [AUTHOR] | Initial draft |
+| 0.1 | 2026-02-14 | IntelliSec Solutions | Initial draft |

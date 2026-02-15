@@ -2,41 +2,70 @@
 
 | **Page Title**   | Release Pipeline                           |
 |------------------|--------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                               |
-| **Status**       | [Draft / In Review / Approved / Deprecated] |
-| **Owner**        | [TEAM OR INDIVIDUAL NAME]                  |
+| **Last Updated** | 2026-02-14                                 |
+| **Status**       | In Review                                  |
+| **Owner**        | IntelliSecOps DevOps Team                  |
 
 ---
 
 ## 1. Release Workflow Diagram
 
-> **[INSERT RELEASE WORKFLOW DIAGRAM HERE]**
->
-> Recommended tools: Mermaid, draw.io, or Lucidchart.
-> Export as PNG and attach to this Confluence page.
->
-> The diagram should show the full promotion path from Dev through Production, including approval gates, smoke tests, and rollback decision points.
+```mermaid
+graph LR
+    A[Push to main] --> B[CD Workflow]
+    B --> C[build-and-push Job]
+    C --> C1[Docker Buildx Setup]
+    C1 --> C2[Azure Login OIDC]
+    C2 --> C3[ACR Login]
+    C3 --> C4[Build + Push Backend Image]
+    C4 --> C5[Build + Push Frontend Image]
+    C5 --> D[deploy Job]
+    D --> D1[Deploy Backend to Container Apps]
+    D1 --> D2[Deploy Frontend to Container Apps]
+    D2 --> D3[Write Deployment Summary]
+
+    E[Manual Dispatch] --> F[Infrastructure Workflow]
+    F --> G{Action Input}
+    G -->|plan| H[Azure Login + What-If]
+    G -->|deploy| I[Azure Login + Create RG + Deploy Bicep]
+```
+
+> Export this Mermaid diagram as PNG and attach to the Confluence page for rendering.
 
 ---
 
 ## 2. Deployment Stages
 
+### Current State
+
+The CMMC Assessor Platform currently has a simplified two-stage pipeline. There is no staging environment yet.
+
 ```
-  +---------+     +------------+     +-----------+     +--------------+
-  |  Build  | --> |    Dev     | --> |  Staging  | --> |  Production  |
-  | (CI)    |     | (auto)     |     | (approval)|     | (approval)   |
-  +---------+     +------------+     +-----------+     +--------------+
-                       |                   |                  |
-                   Smoke Tests         Smoke Tests        Smoke Tests
-                                    + Integration       + Synthetic
-                                       Tests             Monitoring
+  +---------+     +--------------+
+  |  Build  | --> |  Production  |
+  | (CD)    |     | (auto on     |
+  |         |     |  push to     |
+  |         |     |  main)       |
+  +---------+     +--------------+
+                       |
+                  Container Apps
+                  Deployment
 ```
 
-| Stage           | Trigger                          | Approval Required | Smoke Tests | Additional Validation            |
-|-----------------|----------------------------------|-------------------|-------------|----------------------------------|
-| **Dev**         | Automatic on successful build    | No                | Yes         | Basic health check               |
-| **Staging**     | Manual trigger or scheduled      | Yes — [REVIEWER-LIST] | Yes     | Integration tests, performance baseline |
-| **Production**  | Manual trigger after staging sign-off | Yes — [REVIEWER-LIST] | Yes | Synthetic monitoring, canary analysis |
+| Stage           | Trigger                              | Approval Required | Smoke Tests     | Additional Validation            |
+|-----------------|--------------------------------------|-------------------|-----------------|----------------------------------|
+| **Build & Push**| Automatic on push to `main` or manual dispatch | No       | No              | Images tagged with SHA + latest  |
+| **Production**  | Sequential after build-and-push      | No (automatic)    | Deployment summary written | Container Apps deploy action   |
+
+### Planned: Three-Stage Pipeline
+
+Once staging is set up, the pipeline will evolve to:
+
+| Stage           | Trigger                              | Approval Required | Smoke Tests     | Additional Validation            |
+|-----------------|--------------------------------------|-------------------|-----------------|----------------------------------|
+| **Build & Push**| Automatic on push to `main`          | No                | No              | Image build and registry push    |
+| **Staging**     | Automatic after build                | Yes (planned)     | Yes (planned)   | Integration tests, UAT           |
+| **Production**  | Manual trigger after staging sign-off| Yes (planned)     | Yes (planned)   | Health check post-deploy         |
 
 ---
 
@@ -44,51 +73,47 @@
 
 | Environment   | Strategy         | Description                                                                                      | Rollback Method               |
 |---------------|------------------|--------------------------------------------------------------------------------------------------|-------------------------------|
-| **Dev**       | **Rolling**      | Replace all instances in-place. Acceptable downtime in Dev.                                      | Redeploy previous artifact    |
-| **Staging**   | **Blue-Green**   | Deploy to inactive slot; swap after smoke tests pass. Full rollback by swapping back.            | Swap back to previous slot    |
-| **Production**| **Canary**       | Route [X]% of traffic to new version; monitor error rates and latency; gradually increase to 100%. | Route 100% back to old version |
+| **Development** | **Local Docker Compose** | Developers run `docker-compose up` locally with postgres:16-alpine, backend, frontend, adminer | Restart containers / rebuild  |
+| **Production**| **Rolling (Container Apps)** | Azure Container Apps deploy action replaces the running revision with the new image. Scaling rules handle traffic (0-3 replicas). | Redeploy previous image tag   |
+| **Staging**   | **Not yet configured** | Planned: Will mirror production Container Apps configuration                                  | Planned                       |
 
-### When to Use Each Strategy
+### Scaling Configuration (Production)
 
-| Strategy       | Best For                                                         | Trade-offs                                          |
-|----------------|------------------------------------------------------------------|-----------------------------------------------------|
-| **Rolling**    | Non-critical environments, stateless services, speed             | Brief mixed-version state; harder rollback           |
-| **Blue-Green** | Zero-downtime requirement, quick rollback, staging validation    | 2x infrastructure cost during deployment             |
-| **Canary**     | High-traffic production, risk-sensitive changes, gradual rollout | More complex; requires traffic splitting and metrics |
+| Container App | CPU  | Memory | Min Replicas | Max Replicas | Scale Trigger               |
+|---------------|------|--------|--------------|--------------|-----------------------------|
+| `cmmc-api`    | 0.5  | 1Gi    | 0            | 3            | HTTP concurrent requests    |
+| `cmmc-web`    | 0.25 | 0.5Gi  | 0            | 3            | HTTP concurrent requests    |
 
 ---
 
 ## 4. GitHub Actions Environment Protection Rules
 
-| Environment   | Required Reviewers               | Wait Timer  | Branch Policy             | Custom Rules                     |
-|---------------|----------------------------------|-------------|---------------------------|----------------------------------|
-| **Dev**       | None                             | 0 min       | `main`, `develop`, `feature/*` | None                        |
-| **Staging**   | [REVIEWER-1], [REVIEWER-2]       | [MINUTES] min | `main`, `release/*`     | [CUSTOM-RULE-DESCRIPTION]        |
-| **Production**| [REVIEWER-1], [REVIEWER-2], [REVIEWER-3] | [MINUTES] min | `main`, `release/*` | Deployment window: [DAY] [TIME-RANGE] UTC |
+### Current Configuration
 
-### Approval Workflow
+| Environment   | Required Reviewers | Wait Timer  | Branch Policy | Custom Rules                     |
+|---------------|--------------------|-------------|---------------|----------------------------------|
+| **Production**| None (automatic)   | 0 min       | `main`        | Push to main triggers CD         |
 
-1. Deployer triggers the workflow (manual `workflow_dispatch` or automatic promotion).
-2. GitHub pauses the job and notifies the required reviewers.
-3. Reviewer inspects the change summary (commit diff, linked PR, test results).
-4. Reviewer approves or rejects in the GitHub Actions UI.
-5. If approved, the deployment proceeds after any configured wait timer.
+### Planned Configuration
+
+| Environment   | Required Reviewers    | Wait Timer  | Branch Policy | Custom Rules                     |
+|---------------|-----------------------|-------------|---------------|----------------------------------|
+| **Staging**   | 1 reviewer (planned)  | 0 min       | `main`        | Planned                          |
+| **Production**| 2 reviewers (planned) | 5 min       | `main`        | Deployment window: weekdays only |
 
 ---
 
 ## 5. Azure Deployment Methods
 
-| Target Platform         | Deployment Method                          | Tool / Action                                   | Notes                                           |
-|-------------------------|--------------------------------------------|--------------------------------------------------|------------------------------------------------|
-| **AKS (Kubernetes)**    | Helm upgrade                               | `azure/k8s-deploy@v5` or `helm upgrade` via CLI | Supports canary with Istio/Linkerd or Flagger  |
-| **App Service**         | Deployment slot swap                       | `azure/webapps-deploy@v3` + slot swap            | Deploy to staging slot, swap after smoke test   |
-| **Azure Functions**     | Zip deploy to slot                         | `azure/functions-action@v2`                      | Use deployment slots for zero-downtime          |
-| **Infrastructure (IaC)**| Terraform apply / Bicep deploy             | `hashicorp/setup-terraform@v3` or `azure/arm-deploy@v2` | Plan in PR, apply on merge to `main`    |
-| **Container Registry**  | Docker push to ACR                         | `docker/build-push-action@v6` + `azure/docker-login@v2` | Tag with version + SHA                 |
+| Target Platform              | Deployment Method                          | Tool / Action                                   | Notes                                           |
+|------------------------------|--------------------------------------------|-------------------------------------------------|-------------------------------------------------|
+| **Azure Container Apps**     | Deploy container revision                  | `azure/container-apps-deploy-action`            | Primary deployment target for backend + frontend|
+| **Azure Container Registry** | Docker push to ACR                         | `docker/build-push-action@v6` + `azure/docker-login` | Images tagged with short SHA + latest      |
+| **Infrastructure (IaC)**     | Bicep deployment                           | `az deployment group create` with `infra/main.bicep` | Manual dispatch only (plan or deploy)      |
 
 ### Authentication
 
-All Azure deployments authenticate using **OIDC federation** (see [GitHub Actions Overview](./github-actions-overview.md#63-oidc-federation-for-azure-authentication)) via:
+All Azure deployments authenticate using **OIDC federation** via:
 
 ```yaml
 - name: Azure Login
@@ -103,56 +128,67 @@ All Azure deployments authenticate using **OIDC federation** (see [GitHub Action
 
 ## 6. Smoke Tests After Deployment
 
+### Current State
+
+Smoke tests are **not yet automated** in the CD pipeline. The deploy job writes a deployment summary to `GITHUB_STEP_SUMMARY` for manual verification.
+
+### Planned Smoke Tests
+
 | Environment   | Smoke Test Type            | Tool                             | Timeout  | Success Criteria                          |
 |---------------|----------------------------|----------------------------------|----------|-------------------------------------------|
-| **Dev**       | Health endpoint check      | `curl` / `wget` in workflow      | 2 min    | HTTP 200 from `/health`                   |
-| **Staging**   | Health + critical path API | [TEST-FRAMEWORK: e.g., Newman/Postman, pytest, k6] | 5 min | All assertions pass; P95 < [X] ms |
-| **Production**| Synthetic transaction      | [MONITORING-TOOL: e.g., Azure Application Insights availability tests] | 5 min | Transaction completes; no 5xx errors |
+| **Staging**   | Health endpoint check      | `curl` in workflow step          | 2 min    | HTTP 200 from `/health` on backend        |
+| **Production**| Health + API endpoint      | `curl` in workflow step          | 2 min    | HTTP 200 from backend health and frontend root |
 
-### Smoke Test Failure Behavior
+### Smoke Test Failure Behavior (Planned)
 
-- **Dev:** Log warning; do not block further development.
-- **Staging:** Automatically trigger rollback (slot swap back); notify team via [CHANNEL].
-- **Production:** Automatically route traffic back to previous version (canary) or swap slot back (blue-green); page on-call.
+- **Staging:** Block promotion to production; notify team.
+- **Production:** Alert team; manual decision on rollback.
 
 ---
 
 ## 7. Rollback Automation
 
-### Automatic Rollback Triggers
+### Current State
 
-| Condition                                      | Detection Method                    | Rollback Action                             |
-|------------------------------------------------|-------------------------------------|---------------------------------------------|
-| Smoke test failure post-deploy                 | GitHub Actions job failure          | Re-run previous deployment / swap slot back |
-| Error rate exceeds [X]% threshold              | Azure Monitor alert -> webhook      | Trigger rollback workflow via `workflow_dispatch` |
-| Latency P99 exceeds [X] ms for [Y] minutes    | Azure Monitor alert -> webhook      | Trigger rollback workflow via `workflow_dispatch` |
-| Manual decision                                | On-call engineer judgment           | Manual `workflow_dispatch` of rollback workflow |
+Rollback is a **manual process**. To rollback production:
 
-### Rollback Procedure
+1. Identify the previous working image tag (Git SHA) from ACR.
+2. Re-run the CD workflow targeting the previous commit, or manually update the Container App revision via Azure CLI.
 
-1. **AKS:** `helm rollback [RELEASE-NAME] [PREVIOUS-REVISION]` or redeploy previous image tag.
-2. **App Service:** Swap deployment slot back to previous version: `az webapp deployment slot swap`.
-3. **Azure Functions:** Swap slot back or redeploy previous package.
-4. **Infrastructure:** Revert IaC commit and re-apply, or apply previous Terraform state (use with caution).
+### Manual Rollback via Azure CLI
 
-### Rollback Workflow
+```bash
+# Rollback backend to a specific image tag
+az containerapp update \
+  --name cmmc-api \
+  --resource-group rg-cmmc-assessor-prod \
+  --image acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:<previous-sha>
 
-A dedicated `rollback.yml` workflow is available for manual invocation:
+# Rollback frontend to a specific image tag
+az containerapp update \
+  --name cmmc-web \
+  --resource-group rg-cmmc-assessor-prod \
+  --image acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:<previous-sha>
+```
+
+### Planned: Automated Rollback Workflow
+
+A dedicated `rollback.yml` workflow is planned for manual invocation:
 
 ```yaml
-# .github/workflows/rollback.yml
+# .github/workflows/rollback.yml (planned)
 name: Rollback Deployment
 
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Target environment'
+      service:
+        description: 'Service to rollback'
         required: true
         type: choice
-        options: [dev, staging, production]
-      version:
-        description: 'Version to roll back to (e.g., 1.3.1 or image tag)'
+        options: [backend, frontend, both]
+      image_tag:
+        description: 'Image tag (SHA) to roll back to'
         required: true
         type: string
       reason:
@@ -165,82 +201,72 @@ on:
 
 ## 8. Release Tagging and Versioning
 
-### Versioning Scheme
+### Current State
 
-We follow **Semantic Versioning (SemVer)**: `MAJOR.MINOR.PATCH`
+The project does not currently use formal semantic versioning or Git tags. Docker images are tagged with:
+- **Short Git SHA** (e.g., `a3f8c1d`) for traceability
+- **`latest`** for the most recent production build
+
+### Planned Versioning Scheme
+
+Adopt **Semantic Versioning (SemVer)**: `MAJOR.MINOR.PATCH`
 
 | Component  | When to Increment                                       | Example          |
 |------------|---------------------------------------------------------|------------------|
-| **MAJOR**  | Breaking changes to public API or contracts             | `2.0.0`          |
-| **MINOR**  | New features, backward-compatible                       | `1.4.0`          |
-| **PATCH**  | Bug fixes, backward-compatible                          | `1.4.2`          |
+| **MAJOR**  | Breaking changes to API contracts                       | `2.0.0`          |
+| **MINOR**  | New features (e.g., new CMMC assessment capabilities)   | `1.4.0`          |
+| **PATCH**  | Bug fixes, security patches                             | `1.4.2`          |
 
-### Pre-release Tags
+### Planned Tagging Process
 
-| Tag Format             | Purpose                        | Example           |
-|------------------------|--------------------------------|--------------------|
-| `vX.Y.Z-alpha.N`      | Early development builds       | `v1.5.0-alpha.1`  |
-| `vX.Y.Z-beta.N`       | Feature-complete, in testing   | `v1.5.0-beta.3`   |
-| `vX.Y.Z-rc.N`         | Release candidate              | `v1.5.0-rc.1`     |
-
-### Tagging Process
-
-1. Version is determined automatically using [VERSIONING-TOOL: e.g., GitVersion, semantic-release, Nerdbank.GitVersioning].
-2. On merge to `main`, the release workflow creates a Git tag: `v[MAJOR].[MINOR].[PATCH]`.
-3. A GitHub Release is created with auto-generated release notes.
-4. Container images are tagged with both the SemVer version and the Git SHA.
+1. On merge to `main`, create a Git tag with the version number.
+2. Create a GitHub Release with auto-generated release notes.
+3. Tag Docker images with both the SemVer version and the Git SHA.
 
 ---
 
 ## 9. Deployment Notifications
 
+### Current State
+
+Deployment notifications are **not yet configured** beyond the `GITHUB_STEP_SUMMARY` output that the CD workflow writes.
+
+### Planned Notifications
+
 | Event                          | Channel                        | Message Content                                              |
 |--------------------------------|--------------------------------|--------------------------------------------------------------|
-| Deployment started             | [SLACK-CHANNEL / TEAMS-CHANNEL] | Environment, version, deployer, link to workflow run        |
-| Deployment succeeded           | [SLACK-CHANNEL / TEAMS-CHANNEL] | Environment, version, duration, smoke test results          |
-| Deployment failed              | [SLACK-CHANNEL / TEAMS-CHANNEL] | Environment, version, failure step, link to logs            |
-| Rollback triggered             | [SLACK-CHANNEL / TEAMS-CHANNEL] + [PAGERDUTY/OPSGENIE] | Environment, rolled-back-from, rolled-back-to, reason |
-| Production release published   | [EMAIL-DL / TEAMS-CHANNEL]    | Release notes, version, changelog link                       |
+| Deployment started             | GitHub Actions summary         | Environment, version, deployer, link to workflow run        |
+| Deployment succeeded           | GitHub Actions summary         | Environment, image tags, duration                           |
+| Deployment failed              | GitHub Actions (email)         | Environment, failure step, link to logs                     |
+| Rollback triggered             | Team notification (planned)    | Environment, rolled-back-from, rolled-back-to, reason       |
 
 ---
 
-## 10. Example Multi-Stage Deployment Workflow
+## 10. Example CD Workflow
 
 ```yaml
-# .github/workflows/deploy.yml
-name: Deploy
+# .github/workflows/cd.yml
+name: CD
 
 on:
-  workflow_run:
-    workflows: ["Build & Test"]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        type: choice
-        options: [dev, staging, production]
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  # ── Deploy to Dev ──────────────────────────────────────────
-  deploy-dev:
-    name: Deploy to Dev
+  build-and-push:
+    name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.inputs.environment == 'dev' }}
-    environment:
-      name: dev
-      url: ${{ vars.APP_URL }}
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: [ARTIFACT-NAME]-${{ github.sha }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -249,36 +275,36 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Azure App Service (Dev)
-        uses: azure/webapps-deploy@v3
+      - name: ACR Login
+        run: az acr login --name acrcmmcassessorprod
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
         with:
-          app-name: ${{ vars.APP_SERVICE_NAME }}
-          slot-name: staging
-          package: .
+          context: ./backend
+          push: true
+          tags: |
+            acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:${{ github.sha }}
+            acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Smoke Test
-        run: |
-          for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.APP_URL }}/health")
-            if [ "$STATUS" = "200" ]; then echo "Health check passed"; exit 0; fi
-            sleep 5
-          done
-          echo "Health check failed"; exit 1
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:${{ github.sha }}
+            acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # ── Deploy to Staging ──────────────────────────────────────
-  deploy-staging:
-    name: Deploy to Staging
+  deploy:
+    name: Deploy to Azure Container Apps
     runs-on: ubuntu-latest
-    needs: deploy-dev
-    environment:
-      name: staging
-      url: ${{ vars.APP_URL }}
+    needs: build-and-push
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: [ARTIFACT-NAME]-${{ github.sha }}
-
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -286,94 +312,30 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Staging Slot
-        uses: azure/webapps-deploy@v3
+      - name: Deploy Backend Container App
+        uses: azure/container-apps-deploy-action@v1
         with:
-          app-name: ${{ vars.APP_SERVICE_NAME }}
-          slot-name: staging
-          package: .
+          containerAppName: cmmc-api
+          resourceGroup: rg-cmmc-assessor-prod
+          imageToDeploy: acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:${{ github.sha }}
+          targetPort: 3001
 
-      - name: Run Smoke & Integration Tests
-        run: |
-          [TEST-COMMAND]   # e.g., npx newman run tests/postman/smoke.json --env-var "baseUrl=${{ vars.APP_URL }}"
-
-      - name: Swap Staging Slot to Production Slot
-        run: |
-          az webapp deployment slot swap \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.APP_SERVICE_NAME }} \
-            --slot staging \
-            --target-slot production
-
-  # ── Deploy to Production ───────────────────────────────────
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    environment:
-      name: production
-      url: ${{ vars.APP_URL }}
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Deploy Frontend Container App
+        uses: azure/container-apps-deploy-action@v1
         with:
-          name: [ARTIFACT-NAME]-${{ github.sha }}
+          containerAppName: cmmc-web
+          resourceGroup: rg-cmmc-assessor-prod
+          imageToDeploy: acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:${{ github.sha }}
+          targetPort: 80
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy to Production Slot (Canary)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ vars.APP_SERVICE_NAME }}
-          slot-name: canary
-          package: .
-
-      - name: Configure Traffic Split (10% canary)
+      - name: Deployment Summary
         run: |
-          az webapp traffic-routing set \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.APP_SERVICE_NAME }} \
-            --distribution canary=10
-
-      - name: Monitor Canary (wait and check metrics)
-        run: |
-          echo "Monitoring canary for [MINUTES] minutes..."
-          sleep [SECONDS]
-          # [INSERT-METRIC-CHECK-SCRIPT: query Azure Monitor for error rates and latency]
-
-      - name: Promote Canary to 100%
-        run: |
-          az webapp deployment slot swap \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ vars.APP_SERVICE_NAME }} \
-            --slot canary \
-            --target-slot production
-
-      - name: Post-Deployment Smoke Test
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.APP_URL }}/health")
-          if [ "$STATUS" != "200" ]; then echo "Production smoke test failed!"; exit 1; fi
-
-      - name: Notify Success
-        if: success()
-        run: |
-          # [NOTIFICATION-COMMAND: e.g., post to Slack/Teams webhook]
-          echo "Deployment to production succeeded: version [VERSION]"
-
-      - name: Notify Failure & Trigger Rollback
-        if: failure()
-        run: |
-          # [NOTIFICATION-COMMAND]
-          echo "Deployment to production failed — initiating rollback"
-          # [ROLLBACK-COMMAND: e.g., az webapp deployment slot swap back]
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend:** cmmc-api deployed with image tag ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend:** cmmc-web deployed with image tag ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend URL:** https://api.cmmc.intellisecops.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend URL:** https://cmmc.intellisecops.com" >> $GITHUB_STEP_SUMMARY
 ```
-
-> **Note:** Replace all `[PLACEHOLDER]` values with project-specific settings. For AKS deployments, substitute the App Service steps with Helm upgrade commands.
 
 ---
 

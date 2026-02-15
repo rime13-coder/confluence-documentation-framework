@@ -2,19 +2,19 @@
 
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
-| Page Title       | [PROJECT_NAME] - Integration Architecture      |
-| Last Updated     | [YYYY-MM-DD]                                   |
-| Status           | `DRAFT` / `IN REVIEW` / `APPROVED`             |
-| Owner            | [OWNER_NAME]                                   |
-| Reviewers        | [REVIEWER_1], [REVIEWER_2], [REVIEWER_3]       |
-| Version          | [VERSION_NUMBER, e.g., 1.0]                    |
-| Related HLD      | [LINK_TO_ARCHITECTURE_OVERVIEW_HLD]            |
+| Page Title       | CMMC Assessor Platform - Integration Architecture |
+| Last Updated     | 2026-02-14                                     |
+| Status           | `DRAFT`                                        |
+| Owner            | Solution Architect                             |
+| Reviewers        | Technical Lead, Security Architect, Engineering Manager |
+| Version          | 0.1                                            |
+| Related HLD      | CMMC Assessor Platform - Architecture Overview (HLD) |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the integration architecture for **[PROJECT_NAME]**. It describes how internal services communicate with each other and with external systems, including protocols, patterns, authentication mechanisms, error handling, and SLAs. This document serves as the authoritative reference for all integration points within the solution.
+This document defines the integration architecture for the **CMMC Assessor Platform**. It describes how the frontend and backend communicate, how the backend integrates with external Microsoft services (Entra ID, Graph API), and how DNS is managed. This platform uses a synchronous REST API architecture with no message broker or event bus. All integrations are HTTP-based and request-response oriented.
 
 ---
 
@@ -23,13 +23,15 @@ This document defines the integration architecture for **[PROJECT_NAME]**. It de
 <!-- Insert integration landscape / context diagram here using draw.io/Lucidchart -->
 <!--
     Show:
-    - All internal services and their integration boundaries
-    - External systems and third-party services
-    - API gateway as the single entry point for external consumers
-    - Message broker / event bus connecting async services
-    - Integration protocols on each arrow (REST, gRPC, AMQP, SFTP, etc.)
-    - Network boundaries (public internet, VNet, private endpoints)
-    Recommended tool: draw.io, Lucidchart
+    - cmmc-web (Browser SPA) -> cmmc-api (HTTPS REST, JWT auth)
+    - cmmc-web (Browser) -> Microsoft Entra ID (OAuth redirect)
+    - cmmc-api -> Microsoft Entra ID (HTTPS, MSAL token exchange)
+    - cmmc-api -> Microsoft Graph API (HTTPS REST, Bearer token, SharePoint operations)
+    - cmmc-api -> PostgreSQL (TCP, Prisma ORM)
+    - cmmc-api -> Azure Blob Storage (HTTPS REST)
+    - cmmc-api -> Azure Key Vault (HTTPS, startup secrets)
+    - GoDaddy DNS -> Azure Container Apps (CNAME records)
+    - All in Canada Central except Entra ID (global) and Graph API (tenant's M365 geography)
 -->
 
 ---
@@ -40,161 +42,267 @@ This document defines the integration architecture for **[PROJECT_NAME]**. It de
 
 | # | Source | Target | Protocol | Pattern | Auth Method | Data Format | SLA (Availability) | SLA (Latency P95) |
 |---|--------|--------|----------|---------|-------------|-------------|--------------------|--------------------|
-| 1 | [WEB_FRONTEND] | [API_GATEWAY] | HTTPS (REST) | Synchronous | [e.g., Bearer JWT (Entra ID)] | JSON | [e.g., 99.95%] | [e.g., < 200ms] |
-| 2 | [API_GATEWAY] | [SERVICE_A] | HTTPS (REST) | Synchronous | [e.g., Managed Identity (pass-through JWT)] | JSON | [e.g., 99.95%] | [e.g., < 150ms] |
-| 3 | [API_GATEWAY] | [SERVICE_B] | HTTPS (REST) | Synchronous | [e.g., Managed Identity (pass-through JWT)] | JSON | [e.g., 99.95%] | [e.g., < 200ms] |
-| 4 | [SERVICE_A] | [SERVICE_B] | AMQP (Azure Service Bus) | Asynchronous (Event) | [e.g., Managed Identity (RBAC)] | JSON (CloudEvents) | [e.g., 99.99%] | [e.g., < 2s delivery] |
-| 5 | [SERVICE_B] | [SERVICE_C] | AMQP (Azure Service Bus) | Asynchronous (Command) | [e.g., Managed Identity (RBAC)] | JSON (CloudEvents) | [e.g., 99.99%] | [e.g., < 5s delivery] |
-| 6 | [SERVICE_A] | [DB_NAME_1] | TCP (PostgreSQL wire protocol) | Synchronous | [e.g., Managed Identity (Entra auth)] | SQL | [e.g., 99.95%] | [e.g., < 50ms] |
-| 7 | [SERVICE_B] | [REDIS_CACHE] | TCP (Redis protocol) | Synchronous | [e.g., Access key (Key Vault)] | Binary/String | [e.g., 99.9%] | [e.g., < 5ms] |
-| [#] | [SOURCE] | [TARGET] | [PROTOCOL] | [PATTERN] | [AUTH] | [FORMAT] | [SLA_AVAIL] | [SLA_LATENCY] |
+| 1 | cmmc-web (Browser) | cmmc-api | HTTPS (REST) | Synchronous | Bearer JWT (custom JWT issued by cmmc-api after Entra ID or legacy auth) | JSON | 99.5% (Container Apps SLA) | < 500ms |
+| 2 | cmmc-api | PostgreSQL (psql-cmmc-assessor-prod) | TCP (PostgreSQL wire protocol, SSL) | Synchronous | Connection string with username/password (from Key Vault) | SQL (via Prisma ORM) | 99.9% (Azure PostgreSQL Flexible Server SLA) | < 50ms |
+| 3 | cmmc-api | Azure Blob Storage (stcmmcassessorprod) | HTTPS (REST) | Synchronous | Storage account key or SAS token (from Key Vault) | Binary (file content) | 99.9% (Azure Storage SLA) | < 200ms |
+| 4 | cmmc-api | Azure Key Vault (kv-cmmc-assessor-prod) | HTTPS (REST) | Synchronous (startup + on-demand) | Managed Identity or secret reference from Container Apps | JSON | 99.99% (Key Vault SLA) | < 100ms |
+| 5 | Container Apps | Log Analytics (log-cmmc-assessor-prod) | Platform-managed | Asynchronous (log streaming) | Platform-managed (no application auth) | Structured logs | 99.9% (Log Analytics SLA) | N/A (async) |
 
 ### 3.2 External System Integrations
 
 | # | Direction | Source | Target | Protocol | Pattern | Auth Method | Data Format | SLA (Availability) | SLA (Latency P95) |
 |---|-----------|--------|--------|----------|---------|-------------|-------------|--------------------|--------------------|
-| 1 | Inbound | [EXTERNAL_CLIENT_A] | [API_GATEWAY] | HTTPS (REST) | Synchronous | [e.g., OAuth 2.0 Client Credentials] | JSON | [e.g., 99.95%] | [e.g., < 500ms] |
-| 2 | Outbound | [SERVICE_B] | [PAYMENT_PROVIDER] | HTTPS (REST) | Synchronous | [e.g., API Key + HMAC signature] | JSON | [e.g., 99.9% (provider SLA)] | [e.g., < 3s] |
-| 3 | Inbound | [WEBHOOK_SOURCE] | [SERVICE_C] (Azure Functions) | HTTPS (Webhook) | Asynchronous | [e.g., HMAC signature validation] | JSON | [e.g., 99.9%] | [e.g., < 30s processing] |
-| 4 | Outbound | [SERVICE_C] | [EMAIL_PROVIDER] | HTTPS (REST) | Asynchronous | [e.g., API Key] | JSON | [e.g., 99.9%] | [e.g., < 5s] |
-| 5 | Bidirectional | [LEGACY_SYSTEM] | [SERVICE_A] | SFTP / HTTPS | Batch (Daily) | [e.g., SSH key + IP whitelist] | CSV / XML | [e.g., Best effort] | [e.g., N/A (batch)] |
-| [#] | [DIRECTION] | [SOURCE] | [TARGET] | [PROTOCOL] | [PATTERN] | [AUTH] | [FORMAT] | [SLA_AVAIL] | [SLA_LATENCY] |
+| 1 | Outbound (redirect) | cmmc-web (Browser) | Microsoft Entra ID | HTTPS (OAuth 2.0 redirect) | Synchronous (browser redirect) | N/A (public OAuth endpoint) | HTTP redirect with authorization code | 99.99% (Entra ID SLA) | < 2s (including user login UI) |
+| 2 | Outbound | cmmc-api | Microsoft Entra ID (Token endpoint) | HTTPS (REST) | Synchronous | MSAL confidential client (client_id + client_secret) | JSON (OAuth token response) | 99.99% (Entra ID SLA) | < 500ms |
+| 3 | Outbound | cmmc-api | Microsoft Graph API (SharePoint) | HTTPS (REST) | Synchronous | Bearer token (delegated or application Graph API token) | JSON (metadata) + Binary (file content) | 99.9% (Graph API SLA) | < 2s (varies by file size) |
+| 4 | Configuration | GoDaddy DNS | Azure Container Apps | DNS (CNAME) | Static configuration | N/A | DNS records | N/A | N/A |
 
 ---
 
 ## 4. API Gateway Configuration
 
-### 4.1 Azure API Management Overview
+The CMMC Assessor Platform does **not** use Azure API Management or a dedicated API gateway. The cmmc-api Container App serves as both the API and its own ingress handler.
+
+### 4.1 Ingress Configuration
 
 | Aspect | Configuration |
 |--------|--------------|
-| APIM Instance | [e.g., [PROJECT_NAME]-apim] |
-| SKU / Tier | [e.g., Standard v2 / Premium] |
-| Region | [e.g., West Europe] |
-| Custom Domain | [e.g., api.[PROJECT_DOMAIN].com] |
-| Developer Portal | [e.g., Enabled at developer.[PROJECT_DOMAIN].com] |
-| VNet Integration | [e.g., External mode, connected to [VNET_NAME]/[SUBNET_NAME]] |
+| Ingress Type | Azure Container Apps built-in ingress (HTTP) |
+| Custom Domain | Configured via Container Apps custom domain binding with CNAME from GoDaddy |
+| TLS | Azure-managed TLS certificate (free, auto-renewed) |
+| Target Port | 3000 (Express server) |
+| Transport | HTTP (TLS terminated at Container Apps ingress) |
+| Traffic Splitting | Single Active Revision mode (100% to latest revision) |
 
-### 4.2 API Products and Subscriptions
+### 4.2 Rate Limiting
 
-| Product | APIs Included | Access | Rate Limit | Quota | Target Audience |
-|---------|--------------|--------|------------|-------|-----------------|
-| [e.g., Public API] | [e.g., User API v1, Product API v1] | [e.g., Requires subscription key + OAuth] | [e.g., 100 req/min] | [e.g., 10,000 req/day] | [e.g., External partners] |
-| [e.g., Internal API] | [e.g., All internal service APIs] | [e.g., Managed Identity, VNet-restricted] | [e.g., 1,000 req/min] | [e.g., Unlimited] | [e.g., Internal services] |
-| [e.g., Admin API] | [e.g., Admin operations API] | [e.g., Requires Admin role JWT] | [e.g., 50 req/min] | [e.g., 5,000 req/day] | [e.g., Internal admin tools] |
-| [ADDITIONAL_PRODUCT] | [APIS] | [ACCESS] | [RATE_LIMIT] | [QUOTA] | [AUDIENCE] |
+| Aspect | Configuration |
+|--------|--------------|
+| Rate Limiter | express-rate-limit middleware (application-level, not infrastructure-level) |
+| Window | 15 minutes (configurable via RATE_LIMIT_WINDOW_MS) |
+| Max Requests | 100 per window per IP (configurable via RATE_LIMIT_MAX_REQUESTS) |
+| Response on Limit | HTTP 429 with JSON `{ "message": "Too many requests" }` |
+| Scope | Per-IP address |
+| Exclusions | None currently; health check endpoints may be excluded in future |
 
-### 4.3 APIM Policies
+### 4.3 CORS Configuration
 
-| Policy | Scope | Description |
-|--------|-------|-------------|
-| JWT Validation | All APIs (inbound) | [e.g., Validate Entra ID JWT tokens, check audience and issuer claims] |
-| Rate Limiting | Per product (inbound) | [e.g., Enforce rate limits per subscription key using rate-limit-by-key] |
-| CORS | Public APIs (inbound) | [e.g., Allow origins: https://[PROJECT_DOMAIN].com, methods: GET/POST/PUT/DELETE] |
-| IP Filtering | Admin API (inbound) | [e.g., Restrict to corporate IP ranges and VPN] |
-| Request/Response Transformation | [SPECIFIC_API] (inbound/outbound) | [e.g., Add correlation headers, strip internal headers] |
-| Caching | [SPECIFIC_API] (outbound) | [e.g., Cache GET responses for 5 minutes for read-heavy endpoints] |
-| Backend Circuit Breaker | All APIs (backend) | [e.g., Trip after 5 consecutive 5xx errors, 30s recovery window] |
-| Logging | All APIs | [e.g., Log to Application Insights with request/response bodies (sanitized)] |
-| [ADDITIONAL_POLICY] | [SCOPE] | [DESCRIPTION] |
+| Aspect | Configuration |
+|--------|--------------|
+| Allowed Origins | FRONTEND_URL environment variable (e.g., https://app.cmmc-assessor.com) |
+| Allowed Methods | GET, POST, PUT, PATCH, DELETE, OPTIONS |
+| Allowed Headers | Content-Type, Authorization, Cookie |
+| Credentials | true (for cookie-based refresh tokens) |
+| Max Age | 86400 seconds (24 hours preflight cache) |
 
 ### 4.4 API Versioning Strategy
 
 | Aspect | Approach |
 |--------|----------|
-| Versioning Method | [e.g., URL path versioning: /api/v1/resource, /api/v2/resource] |
-| Deprecation Policy | [e.g., Minimum 6 months notice before retiring a version; communicated via developer portal and API response headers] |
-| Header Indicator | [e.g., `Sunset: Sat, 01 Jan 2027 00:00:00 GMT` and `Deprecation: true` headers on deprecated versions] |
-| Concurrent Versions | [e.g., Maximum 2 major versions supported simultaneously] |
+| Versioning Method | Not currently versioned; all endpoints under /api/ prefix |
+| Deprecation Policy | Not yet established; will be defined when API versioning is introduced |
+| Rationale | MVP phase with single consumer (cmmc-web SPA); versioning complexity deferred until external API consumers exist |
 
 ---
 
 ## 5. Message Broker and Event Bus Design
 
-### 5.1 Messaging Platform Overview
+This application does **not** use a message broker or event bus. All communication is synchronous HTTP REST.
 
-| Aspect | Configuration |
-|--------|--------------|
-| Service | [e.g., Azure Service Bus] |
-| SKU / Tier | [e.g., Premium (1 Messaging Unit)] |
-| Namespace | [e.g., [PROJECT_NAME]-sb.servicebus.windows.net] |
-| Region | [e.g., West Europe] |
-| Authentication | [e.g., Managed Identity with Azure RBAC (Service Bus Data Sender/Receiver)] |
-| VNet Integration | [e.g., Private endpoint in [VNET_NAME]/[SUBNET_NAME]] |
+### 5.1 Rationale for No Message Broker
 
-### 5.2 Topics and Subscriptions
+| Factor | Assessment |
+|--------|-----------|
+| Traffic Volume | < 50 concurrent users; all operations are user-initiated HTTP requests |
+| Complexity Budget | Small team (1-3 developers); message broker adds operational complexity with limited benefit at MVP scale |
+| Async Requirements | No current requirements for background processing, event-driven workflows, or inter-service communication |
+| Future Consideration | If background processing is needed (e.g., scheduled report generation, email notifications, large evidence file processing), Azure Service Bus or Azure Functions can be added incrementally without architectural overhaul |
 
-| Topic | Description | Publisher(s) | Message TTL | Max Delivery Count |
-|-------|-------------|-------------|-------------|-------------------|
-| `user-events` | User lifecycle events | [SERVICE_A] | [e.g., 14 days] | [e.g., 10] |
-| `order-events` | Order lifecycle events | [SERVICE_B] | [e.g., 14 days] | [e.g., 10] |
-| `payment-events` | Payment processing events | [SERVICE_B] | [e.g., 14 days] | [e.g., 10] |
-| `notification-commands` | Notification dispatch commands | Multiple services | [e.g., 7 days] | [e.g., 5] |
-| [ADDITIONAL_TOPIC] | [DESCRIPTION] | [PUBLISHER(S)] | [TTL] | [MAX_DELIVERY] |
+### 5.2 Synchronous Patterns Used Instead
 
-| Topic | Subscription | Subscriber | Filter Rule | Description |
-|-------|-------------|-----------|-------------|-------------|
-| `user-events` | `order-svc` | [SERVICE_B] | [e.g., `eventType = 'UserCreated'`] | [e.g., Provision default order preferences for new users] |
-| `user-events` | `notification-svc` | [SERVICE_C] | [e.g., `eventType IN ('UserCreated', 'UserDeactivated')`] | [e.g., Send welcome/goodbye email] |
-| `order-events` | `notification-svc` | [SERVICE_C] | [e.g., `eventType = 'OrderPlaced'`] | [e.g., Send order confirmation notification] |
-| `order-events` | `report-worker` | [WORKER_D] | [e.g., No filter (all events)] | [e.g., Update reporting materialized views] |
-| `payment-events` | `order-svc` | [SERVICE_B] | [e.g., `eventType = 'PaymentProcessed'`] | [e.g., Update order status to confirmed/failed] |
-| [ADDITIONAL_SUBSCRIPTION] | [SUBSCRIPTION] | [SUBSCRIBER] | [FILTER] | [DESCRIPTION] |
-
-### 5.3 Queues (Point-to-Point)
-
-| Queue | Description | Producer | Consumer | Message TTL | Max Delivery Count | Sessions |
-|-------|------------|----------|----------|-------------|-------------------|----------|
-| `report-generation` | Report generation requests | [SERVICE_B], Admin UI | [WORKER_D] | [e.g., 24 hours] | [e.g., 3] | [e.g., Yes (by report type)] |
-| `data-export` | Data export requests (GDPR) | [SERVICE_A] | [WORKER_D] | [e.g., 48 hours] | [e.g., 3] | [e.g., Yes (by user ID)] |
-| [ADDITIONAL_QUEUE] | [DESCRIPTION] | [PRODUCER] | [CONSUMER] | [TTL] | [MAX_DELIVERY] | [SESSIONS] |
-
-### 5.4 [OPTIONAL] Azure Event Grid Configuration
-
-| Aspect | Configuration |
-|--------|--------------|
-| Use Case | [e.g., React to Azure resource events (blob created, Key Vault secret rotated)] |
-| Topic Type | [e.g., System topics for Azure Storage, Key Vault] |
-| Subscriber | [e.g., Azure Functions triggered on BlobCreated events] |
-| Dead-Letter | [e.g., Blob storage container for failed deliveries] |
-
-| Event Source | Event Type | Subscriber | Handler |
-|-------------|-----------|-----------|---------|
-| [e.g., Azure Storage Account] | `Microsoft.Storage.BlobCreated` | [e.g., Azure Function: ProcessUpload] | [e.g., Virus scan, thumbnail generation] |
-| [e.g., Azure Key Vault] | `Microsoft.KeyVault.SecretNearExpiry` | [e.g., Azure Function: RotateSecret] | [e.g., Auto-rotate and update dependent services] |
-| [ADDITIONAL_SOURCE] | [EVENT_TYPE] | [SUBSCRIBER] | [HANDLER] |
-
-### 5.5 [OPTIONAL] Azure Event Hubs Configuration
-
-| Aspect | Configuration |
-|--------|--------------|
-| Use Case | [e.g., High-throughput telemetry/event ingestion, streaming analytics] |
-| Namespace | [e.g., [PROJECT_NAME]-eh.servicebus.windows.net] |
-| SKU / Tier | [e.g., Standard, 2 TUs] |
-| Partitions | [e.g., 8] |
-| Consumer Groups | [e.g., `analytics-cg`, `archival-cg`] |
-| Capture | [e.g., Enabled, Avro format to Azure Blob Storage, 5-minute windows] |
+| Pattern | Where Applied | Description |
+|---------|---------------|-------------|
+| Request-Response REST | All 68+ API endpoints | Client sends HTTP request, waits for response; Express middleware pipeline handles auth, validation, business logic, and response |
+| Database Transactions | Assessment mutations + Audit Log writes | Prisma transactions ensure atomicity: entity mutation and AuditLog entry are written in the same transaction |
+| Inline Document Generation | SSP DOCX, Excel, PDF export | Documents generated synchronously on request; response streamed back to client; acceptable for current document sizes |
+| Inline Graph API Calls | Evidence upload/download | Evidence operations call Graph API synchronously and return result to client; file sizes typically < 50MB |
 
 ---
 
 ## 6. Third-Party Integrations
 
-| # | Service | Purpose | API Version | Protocol | Auth Method | Rate Limits | SLA | Data Exchanged | Fallback Strategy |
-|---|---------|---------|-------------|----------|-------------|-------------|-----|----------------|-------------------|
-| 1 | [e.g., Stripe] | Payment processing | [e.g., v2023-10-16] | HTTPS (REST) | [e.g., API Key (Bearer)] | [e.g., 100 req/s] | [e.g., 99.99%] | [e.g., Payment intents, refunds, webhooks] | [e.g., Queue payments for retry, show "payment pending" to user] |
-| 2 | [e.g., SendGrid] | Transactional email | [e.g., v3] | HTTPS (REST) | [e.g., API Key] | [e.g., 600 req/min] | [e.g., 99.95%] | [e.g., Email templates, recipient data] | [e.g., Queue emails in Service Bus, retry with exponential backoff] |
-| 3 | [e.g., Twilio] | SMS notifications | [e.g., 2010-04-01] | HTTPS (REST) | [e.g., Account SID + Auth Token] | [e.g., 100 msg/s] | [e.g., 99.95%] | [e.g., Phone numbers, message body] | [e.g., Failover to secondary SMS provider] |
-| 4 | [e.g., Azure Maps] | Geocoding and mapping | [e.g., 2024-04-01-preview] | HTTPS (REST) | [e.g., Subscription Key / Managed Identity] | [e.g., 50 QPS] | [e.g., 99.9%] | [e.g., Addresses, coordinates] | [e.g., Return cached results, degrade gracefully] |
-| 5 | [e.g., [LEGACY_ERP]] | Master data sync | [e.g., SOAP 1.2 / Custom REST] | HTTPS / SFTP | [e.g., Client certificate + IP whitelist] | [e.g., 10 req/s] | [e.g., 99.5% (business hours)] | [e.g., Product master, customer master] | [e.g., Use last-known-good cached data, alert ops team] |
-| [#] | [SERVICE] | [PURPOSE] | [API_VERSION] | [PROTOCOL] | [AUTH] | [RATE_LIMITS] | [SLA] | [DATA] | [FALLBACK] |
+### 6.1 Microsoft Entra ID (Authentication)
 
-### 6.1 Third-Party Dependency Risk Assessment
+| Aspect | Detail |
+|--------|--------|
+| Service | Microsoft Entra ID (formerly Azure Active Directory) |
+| Purpose | Primary authentication via OAuth 2.0 / OpenID Connect; tenant onboarding via admin consent flow |
+| API Version | Microsoft identity platform v2.0 |
+| Protocol | HTTPS (OAuth 2.0 / OIDC) |
+| Auth Method | MSAL confidential client (@azure/msal-node 2.15); client_id + client_secret |
+| Client Library | @azure/msal-node 2.15.0 |
+| Rate Limits | Subject to Microsoft identity platform throttling (not typically hit at MVP scale) |
+| SLA | 99.99% (Microsoft Entra ID SLA) |
+| Data Exchanged | Authorization codes, access tokens, ID tokens, refresh tokens, user profile claims (name, email, oid, tid) |
+| Fallback Strategy | Legacy username/password authentication available as fallback if Entra ID is unavailable or tenant cannot use Entra ID |
 
-| Service | Criticality | Single Point of Failure? | Alternative Provider | Migration Effort | Contract Expiry |
-|---------|------------|-------------------------|---------------------|-----------------|-----------------|
-| [e.g., Stripe] | Critical | [e.g., Yes for payments] | [e.g., Adyen, Braintree] | [e.g., High (3-6 months)] | [e.g., Annual, auto-renew] |
-| [e.g., SendGrid] | High | [e.g., No (queued, retryable)] | [e.g., Mailgun, AWS SES] | [e.g., Low (1-2 weeks)] | [e.g., Monthly] |
-| [ADDITIONAL_SERVICE] | [CRITICALITY] | [SPOF] | [ALTERNATIVE] | [MIGRATION_EFFORT] | [CONTRACT] |
+#### 6.1.1 Entra ID Authentication Flows
+
+**Standard Login Flow:**
+```
+1. User clicks "Sign in with Microsoft" in cmmc-web
+2. Browser redirects to: GET /api/auth/login
+3. cmmc-api generates PKCE code verifier/challenge
+4. cmmc-api redirects browser to Entra ID authorization endpoint:
+   https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+   ?client_id={AZURE_CLIENT_ID}
+   &response_type=code
+   &redirect_uri={AZURE_REDIRECT_URI}
+   &scope=openid profile email User.Read
+   &code_challenge={challenge}
+   &code_challenge_method=S256
+   &state={csrf_token}
+5. User authenticates with Entra ID (MFA if tenant policy requires)
+6. Entra ID redirects to: GET /api/auth/callback?code={auth_code}&state={csrf_token}
+7. cmmc-api exchanges authorization code for tokens via MSAL:
+   POST https://login.microsoftonline.com/common/oauth2/v2.0/token
+8. cmmc-api validates ID token, extracts user claims (oid, email, name, tid)
+9. cmmc-api creates/updates User record; resolves tenant from Entra ID tid
+10. cmmc-api issues custom JWT (access token) and RefreshToken (stored in DB)
+11. Browser receives JWT in response; stores in memory/cookie
+```
+
+**Admin Consent Flow (Tenant Onboarding):**
+```
+1. Tenant admin clicks "Set up organization" in cmmc-web
+2. Browser redirects to: GET /api/auth/consent
+3. cmmc-api redirects to Entra ID admin consent endpoint:
+   https://login.microsoftonline.com/common/adminconsent
+   ?client_id={AZURE_CLIENT_ID}
+   &redirect_uri={AZURE_REDIRECT_URI}
+   &state={tenant_setup_state}
+4. Entra ID shows admin consent prompt listing all requested permissions
+5. Tenant admin grants consent for their Entra ID tenant
+6. Entra ID redirects back to callback with admin_consent=true
+7. cmmc-api creates Tenant record with entraIdTenantId from the consent response
+8. All users from that Entra ID tenant can now authenticate
+```
+
+**Incremental Consent (SharePoint / Graph API):**
+```
+1. User attempts to use evidence management features
+2. cmmc-api detects missing Graph API permissions for SharePoint
+3. Browser redirects to: GET /api/auth/sharepoint-consent
+4. cmmc-api redirects to Entra ID with additional scopes:
+   &scope=openid profile email Sites.ReadWrite.All Files.ReadWrite.All
+5. User consents to SharePoint permissions
+6. cmmc-api receives Graph API tokens with SharePoint scope
+7. Graph API tokens encrypted (AES-256-GCM) and stored in UserToken table
+```
+
+#### 6.1.2 Token Management
+
+| Token Type | Storage | Expiry | Rotation | Security |
+|-----------|---------|--------|----------|----------|
+| Entra ID Access Token | Used transiently in backend (not stored raw) | ~1 hour (Entra ID default) | Automatic via MSAL token cache | Used only for initial user validation; not stored after JWT issuance |
+| Entra ID ID Token | Used transiently for claims extraction | ~1 hour | N/A (one-time use for claims) | Claims extracted and discarded |
+| Custom JWT (Platform Access Token) | Client-side (memory or httpOnly cookie) | 7 days (configurable via JWT_EXPIRY) | Refresh token rotation | Verified on every API request; deny list checked for revocation |
+| Refresh Token | PostgreSQL (RefreshToken table) | 30 days | Family-based rotation: each use issues new refresh token; reuse of old token revokes entire family | Family tracking detects token theft |
+| Graph API Access Token | PostgreSQL (UserToken table, AES-256-GCM encrypted) | ~1 hour | Automatic refresh via MSAL when expired | Application-layer encryption before storage; decrypted only for Graph API calls |
+| Graph API Refresh Token | PostgreSQL (UserToken table, AES-256-GCM encrypted) | 90 days (Microsoft default) | Used to obtain new Graph API access tokens | Same encryption as access token |
+
+### 6.2 Microsoft Graph API (SharePoint Evidence Management)
+
+| Aspect | Detail |
+|--------|--------|
+| Service | Microsoft Graph API v1.0 |
+| Purpose | Evidence file management: list, upload, download, preview, delete files in tenant's SharePoint document library |
+| Base URL | https://graph.microsoft.com/v1.0 |
+| Protocol | HTTPS (REST) |
+| Auth Method | Bearer token (delegated Graph API token stored encrypted in UserToken table) |
+| Client Library | Direct Axios HTTP calls to Graph API endpoints (no SDK) |
+| Rate Limits | Graph API throttling: 10,000 requests per 10 minutes per app per tenant (Microsoft-imposed) |
+| SLA | 99.9% (Microsoft Graph API SLA) |
+| Data Exchanged | SharePoint file metadata (JSON), file content (binary upload/download), folder listings |
+| Fallback Strategy | Return error to client with guidance to retry; evidence management is not on the critical path for assessment scoring |
+
+#### 6.2.1 Graph API Endpoints Used
+
+| Operation | Graph API Endpoint | HTTP Method | Purpose |
+|-----------|-------------------|-------------|---------|
+| Check auth status | N/A (checks UserToken table) | N/A | Verify user has valid Graph API tokens with SharePoint scope |
+| List files | /sites/{siteId}/drive/root/children | GET | List evidence files in tenant's SharePoint document library root |
+| List files in folder | /sites/{siteId}/drive/items/{folderId}/children | GET | List evidence files in a specific folder |
+| Upload file (< 4MB) | /sites/{siteId}/drive/root:/{fileName}:/content | PUT | Upload small evidence file directly |
+| Upload file (> 4MB) | /sites/{siteId}/drive/root:/{fileName}:/createUploadSession | POST + PUT chunks | Resumable upload for larger evidence files |
+| Download file | /sites/{siteId}/drive/items/{itemId}/content | GET | Download evidence file content |
+| Preview file | /sites/{siteId}/drive/items/{itemId}/preview | POST | Generate preview URL for viewing evidence file in browser |
+| Delete file | /sites/{siteId}/drive/items/{itemId} | DELETE | Delete evidence file from SharePoint |
+| Get site | /sites/{hostname}:/{sitePath} | GET | Resolve SharePoint site by URL for tenant configuration validation |
+
+#### 6.2.2 Graph API Token Refresh Flow
+
+```
+1. cmmc-api receives evidence operation request from client
+2. cmmc-api retrieves UserToken from database
+3. cmmc-api decrypts access token using AES-256-GCM (TOKEN_ENCRYPTION_KEY)
+4. If token expiry < now:
+   a. Decrypt refresh token
+   b. Call MSAL acquireTokenByRefreshToken() to get new access token
+   c. Encrypt new access token (and new refresh token if provided) with AES-256-GCM
+   d. Update UserToken record in database
+5. Make Graph API call with valid access token
+6. If Graph API returns 401:
+   a. Attempt refresh (step 4)
+   b. If refresh fails (e.g., refresh token expired or revoked):
+      - Delete UserToken record
+      - Return 401 to client with message: "SharePoint authorization expired. Please re-authorize."
+      - Client redirects user to incremental consent flow
+```
+
+#### 6.2.3 Graph API Error Handling
+
+| Error Code | Meaning | Handling Strategy | Client Response |
+|-----------|---------|-------------------|-----------------|
+| 400 | Bad request (malformed query) | Log error; do not retry | HTTP 400 with descriptive message |
+| 401 | Token expired or invalid | Attempt token refresh via MSAL; if refresh fails, prompt re-consent | HTTP 401 with re-authorization guidance |
+| 403 | Insufficient permissions | Cannot auto-fix; user must re-consent with correct scopes | HTTP 403 with message to contact admin or re-consent |
+| 404 | Site or file not found | Return 404 | HTTP 404 with message to verify SharePoint site URL |
+| 409 | Conflict (e.g., file name collision) | Return conflict to client | HTTP 409 with message about duplicate file name |
+| 429 | Throttled (too many requests) | Read Retry-After header; wait and retry once; if still throttled, return error | HTTP 503 with Retry-After header |
+| 500 | Graph API internal error | Log error; retry once after 2s delay; if still failing, return error | HTTP 502 with message "SharePoint service temporarily unavailable" |
+| 502/503/504 | Gateway/service unavailable | Retry once after 2s delay | HTTP 502 with retry guidance |
+| Network timeout | Connection or read timeout | Retry once after 2s delay | HTTP 504 with timeout message |
+
+### 6.3 GoDaddy DNS
+
+| Aspect | Detail |
+|--------|--------|
+| Service | GoDaddy DNS Management |
+| Purpose | DNS configuration for custom domains pointing to Azure Container Apps |
+| Protocol | DNS (CNAME records) |
+| Auth Method | N/A (manual DNS configuration via GoDaddy admin console) |
+| Integration Type | Static configuration (not API-integrated) |
+| Data Exchanged | CNAME records mapping custom domains to Container Apps FQDN |
+
+#### 6.3.1 DNS Records
+
+| Record Type | Host | Value | TTL | Purpose |
+|------------|------|-------|-----|---------|
+| CNAME | api.cmmc-assessor.com (example) | cmmc-api.{region}.azurecontainerapps.io | 3600 | Route API traffic to backend Container App |
+| CNAME | app.cmmc-assessor.com (example) | cmmc-web.{region}.azurecontainerapps.io | 3600 | Route web traffic to frontend Container App |
+| TXT | asuid.api.cmmc-assessor.com (example) | {Container Apps custom domain verification ID} | 3600 | Domain ownership verification for Azure Container Apps |
+| TXT | asuid.app.cmmc-assessor.com (example) | {Container Apps custom domain verification ID} | 3600 | Domain ownership verification for Azure Container Apps |
+
+### 6.4 Third-Party Dependency Risk Assessment
+
+| Service | Criticality | Single Point of Failure? | Alternative Provider | Migration Effort | Contract |
+|---------|------------|-------------------------|---------------------|-----------------|----------|
+| Microsoft Entra ID | Critical (primary auth) | Yes for Entra ID auth; legacy auth is fallback | No practical alternative for enterprise SSO | N/A (deeply integrated) | Microsoft Azure subscription |
+| Microsoft Graph API (SharePoint) | High (evidence management) | No (evidence management is optional/supplementary to core assessment functionality) | Azure Blob Storage as alternative evidence store | Medium (2-4 weeks) | Microsoft Azure subscription |
+| GoDaddy DNS | Low (static config) | No (DNS can be migrated to any provider) | Azure DNS, Cloudflare, Route 53 | Low (< 1 day) | Annual domain registration |
+| Azure Container Apps | Critical (hosting) | Yes (application hosting) | Azure App Service, AKS | Medium (2-4 weeks) | Microsoft Azure subscription |
+| Azure PostgreSQL | Critical (data store) | Yes (all application data) | Self-managed PostgreSQL, Azure SQL, CockroachDB | High (4-8 weeks) | Microsoft Azure subscription |
 
 ---
 
@@ -204,64 +312,43 @@ This document defines the integration architecture for **[PROJECT_NAME]**. It de
 
 | Integration | Retry Strategy | Max Retries | Initial Delay | Max Delay | Backoff Type | Retryable Errors |
 |-------------|---------------|-------------|---------------|-----------|-------------|------------------|
-| [API_GATEWAY] -> [SERVICE_A] | Exponential backoff + jitter | 3 | 500ms | 10s | Exponential | 408, 429, 500, 502, 503, 504 |
-| [SERVICE_B] -> [PAYMENT_PROVIDER] | Exponential backoff + jitter | 3 | 1s | 30s | Exponential | 408, 429, 500, 502, 503, 504 |
-| [SERVICE_C] -> [EMAIL_PROVIDER] | Fixed interval | 5 | 2s | 2s | None (fixed) | 429, 500, 502, 503 |
-| [SERVICE_A] -> [LEGACY_SYSTEM] | Exponential backoff | 2 | 2s | 15s | Exponential | 408, 500, 502, 503, 504 |
-| [ADDITIONAL_INTEGRATION] | [STRATEGY] | [MAX] | [INITIAL] | [MAX_DELAY] | [BACKOFF] | [RETRYABLE] |
+| cmmc-api -> Microsoft Entra ID (token exchange) | No retry (redirect-based flow) | 0 | N/A | N/A | N/A | N/A (user re-initiates login on failure) |
+| cmmc-api -> Microsoft Entra ID (token refresh via MSAL) | MSAL built-in retry | 1 (MSAL default) | Immediate | N/A | N/A | 5xx, network errors |
+| cmmc-api -> Microsoft Graph API | Application-level retry | 1 | 2s (or Retry-After header value for 429) | 30s | Fixed | 429, 500, 502, 503, 504, network timeout |
+| cmmc-api -> PostgreSQL (Prisma) | Prisma connection pool retry | Prisma default (connection pool) | Prisma default | N/A | N/A | Connection pool exhaustion, transient network errors |
+| cmmc-api -> Azure Key Vault | No explicit retry (startup) | 0 | N/A | N/A | N/A | Application fails to start if Key Vault unreachable |
+| cmmc-api -> Azure Blob Storage | No explicit retry currently | 0 | N/A | N/A | N/A | Error returned to client |
 
-### 7.2 Asynchronous Integration Retry Policy
-
-| Queue / Topic | Max Delivery Count | Delay Between Retries | Dead-Letter On | DLQ Monitoring | Remediation |
-|--------------|-------------------|----------------------|----------------|----------------|-------------|
-| `user-events` | 10 | [e.g., Service Bus native retry (exponential)] | Max delivery exceeded, TTL expired | [e.g., Alert on DLQ depth > 0] | [e.g., Manual review + replay tool] |
-| `order-events` | 10 | [e.g., Service Bus native retry] | Max delivery exceeded, TTL expired | [e.g., Alert on DLQ depth > 0] | [e.g., Manual review + replay tool] |
-| `report-generation` | 3 | [e.g., Scheduled retry at 1min, 5min, 15min] | Max delivery exceeded | [e.g., Alert + admin dashboard] | [e.g., Manual re-trigger via admin UI] |
-| [ADDITIONAL_QUEUE] | [MAX_DELIVERY] | [DELAY] | [DLQ_CONDITION] | [MONITORING] | [REMEDIATION] |
-
-### 7.3 Timeout Configuration
+### 7.2 Timeout Configuration
 
 | Integration | Connection Timeout | Request Timeout | Justification |
 |-------------|-------------------|-----------------|---------------|
-| [API_GATEWAY] -> Backend services | [e.g., 5s] | [e.g., 30s] | [e.g., Standard API call duration] |
-| [SERVICE_B] -> [PAYMENT_PROVIDER] | [e.g., 5s] | [e.g., 60s] | [e.g., Payment processing may take longer] |
-| [SERVICE_C] -> [EMAIL_PROVIDER] | [e.g., 5s] | [e.g., 15s] | [e.g., Email send is quick, fire and confirm] |
-| Database connections | [e.g., 15s] | [e.g., 30s] | [e.g., Accounts for connection pool exhaustion scenarios] |
-| Redis cache | [e.g., 3s] | [e.g., 5s] | [e.g., Cache should be fast; timeout and fallback to DB on failure] |
-| [ADDITIONAL_INTEGRATION] | [CONN_TIMEOUT] | [REQ_TIMEOUT] | [JUSTIFICATION] |
+| cmmc-api -> Microsoft Entra ID (MSAL) | MSAL default (varies) | MSAL default (~30s) | Token exchange should be fast; longer timeout indicates infrastructure issue |
+| cmmc-api -> Microsoft Graph API (Axios) | 10s | 60s (file operations may be large) | File uploads/downloads can take time for larger evidence files |
+| cmmc-api -> Microsoft Graph API (metadata) | 10s | 15s | Metadata operations (list, delete, preview) should be fast |
+| cmmc-api -> PostgreSQL (Prisma) | Prisma default (5s connection, 10s pool timeout) | 30s (query timeout via Prisma) | Most queries return in < 100ms; 30s timeout catches runaway queries |
+| cmmc-api -> Azure Blob Storage | 10s | 60s | File operations may involve larger files |
+| cmmc-api -> Azure Key Vault | 10s | 10s | Secret retrieval is fast; timeout indicates Key Vault issues |
 
 ---
 
 ## 8. Circuit Breaker Patterns
 
-### 8.1 Circuit Breaker Configuration
+The application does **not** currently implement circuit breaker patterns. This is identified as a gap and is planned for future implementation as part of the resilience improvement roadmap.
 
-| Integration | Library / Mechanism | Failure Threshold | Success Threshold | Break Duration | Fallback Behavior |
-|-------------|--------------------|--------------------|-------------------|----------------|-------------------|
-| [SERVICE_B] -> [PAYMENT_PROVIDER] | [e.g., Polly (.NET) / resilience4j] | [e.g., 5 failures in 30s window] | [e.g., 3 consecutive successes] | [e.g., 60s] | [e.g., Return "payment_pending" status, queue for retry] |
-| [SERVICE_C] -> [EMAIL_PROVIDER] | [e.g., Polly (.NET)] | [e.g., 10 failures in 60s window] | [e.g., 2 consecutive successes] | [e.g., 30s] | [e.g., Queue message to DLQ, alert ops] |
-| [SERVICE_A] -> [LEGACY_SYSTEM] | [e.g., Polly (.NET)] | [e.g., 3 failures in 60s window] | [e.g., 2 consecutive successes] | [e.g., 120s] | [e.g., Return cached/stale data, log degradation] |
-| [API_GATEWAY] -> Backend | [e.g., APIM backend circuit breaker policy] | [e.g., 5 consecutive 5xx] | [e.g., Automatic after break duration] | [e.g., 30s] | [e.g., Return 503 with Retry-After header] |
-| [ADDITIONAL_INTEGRATION] | [LIBRARY] | [FAILURE_THRESHOLD] | [SUCCESS_THRESHOLD] | [BREAK_DURATION] | [FALLBACK] |
+### 8.1 Current State
 
-### 8.2 Circuit Breaker States
+| Integration | Circuit Breaker | Justification |
+|-------------|----------------|---------------|
+| cmmc-api -> Microsoft Graph API | Not implemented | Graph API failures are isolated to evidence management features; they do not cascade to core assessment functionality; client receives error and can retry manually |
+| cmmc-api -> Microsoft Entra ID | Not applicable | Auth failures naturally circuit-break at the user level (user sees login error); MSAL handles transient failures internally |
+| cmmc-api -> PostgreSQL | Not applicable | Database failures are catastrophic (application cannot function); circuit breaker would not improve the situation |
 
-```
-[Closed] --(failure threshold exceeded)--> [Open] --(break duration elapsed)--> [Half-Open]
-   ^                                                                                 |
-   |---- (success threshold met in half-open) <------ [test request succeeds] -------|
-   |                                                                                 |
-   |                                          [Open] <-- (test request fails) -------|
-```
+### 8.2 Planned Improvements
 
-### 8.3 Bulkhead Pattern
-
-| Resource Pool | Max Concurrent | Queue Depth | Purpose |
-|--------------|---------------|-------------|---------|
-| [e.g., Payment API calls] | [e.g., 20 concurrent] | [e.g., 50 queued] | [e.g., Prevent payment service issues from exhausting thread pool] |
-| [e.g., Legacy system calls] | [e.g., 5 concurrent] | [e.g., 10 queued] | [e.g., Legacy system cannot handle high concurrency] |
-| [e.g., Database connections] | [e.g., 100 per service instance] | N/A (connection pool) | [e.g., Prevent connection exhaustion] |
-| [ADDITIONAL_POOL] | [MAX_CONCURRENT] | [QUEUE_DEPTH] | [PURPOSE] |
+| Integration | Planned Implementation | Trigger |
+|-------------|----------------------|---------|
+| cmmc-api -> Microsoft Graph API | Application-level circuit breaker: track consecutive failures per tenant; after 5 consecutive failures in 60s, return "SharePoint temporarily unavailable" for 30s without making Graph API calls | Included in Phase 3 of security remediation (months 4-5) |
 
 ---
 
@@ -271,49 +358,67 @@ This document defines the integration architecture for **[PROJECT_NAME]**. It de
 
 | Test Level | Scope | Tools | Environment | Frequency |
 |-----------|-------|-------|-------------|-----------|
-| Unit Tests (Mocked) | Individual service integration logic | [e.g., xUnit + Moq (.NET), Jest + nock (Node.js)] | Local / CI | Every PR |
-| Contract Tests | API contract verification between producer/consumer | [e.g., Pact / Specmatic] | CI | Every PR |
-| Integration Tests | Service + real dependencies (DB, cache, message broker) | [e.g., Testcontainers, Docker Compose] | CI (GitHub Actions) | Every PR |
-| Component Tests | Single service end-to-end with stubbed external deps | [e.g., WireMock for HTTP, Testcontainers for infra] | CI | Every PR |
-| End-to-End Tests | Full integration across services | [e.g., Playwright + custom test harness] | Staging environment | Nightly / pre-release |
-| Smoke Tests | Critical path verification post-deploy | [e.g., Custom health check + smoke test suite] | All environments | Every deployment |
+| Manual API Testing | Individual endpoint testing | Postman, curl | Local development | During development |
+| Integration Tests (planned) | Backend + PostgreSQL | Jest + Prisma test utilities + Docker Compose | Local / CI (planned) | Per PR (planned) |
+| Entra ID Integration Testing | OAuth flow end-to-end | Manual browser testing | Development Entra ID app registration | Before deployment to production |
+| Graph API Integration Testing | SharePoint evidence operations | Manual testing with test SharePoint site | Development M365 tenant | Before deployment to production |
+| Smoke Tests (planned) | Critical path verification post-deploy | Custom health check script | Production | Per deployment (planned) |
+
+**Note:** Comprehensive automated integration testing is not yet implemented. This is identified as a gap and is planned for the security remediation phase. Current testing relies on manual testing with Postman and browser-based OAuth flow verification.
 
 ### 9.2 Test Environment Configuration
 
 | Dependency | Test Strategy | Tool / Approach |
 |-----------|--------------|-----------------|
-| Azure Service Bus | [e.g., Real Service Bus namespace (dedicated test namespace)] | [e.g., Separate namespace: [PROJECT]-sb-test] |
-| Azure PostgreSQL | [e.g., Testcontainers (PostgreSQL container in CI)] | [e.g., Testcontainers library] |
-| Redis | [e.g., Testcontainers (Redis container in CI)] | [e.g., Testcontainers library] |
-| External APIs (Payment, Email) | [e.g., WireMock stubs in CI, sandbox environments in staging] | [e.g., WireMock / provider sandbox] |
-| [LEGACY_SYSTEM] | [e.g., Mock server with recorded responses] | [e.g., WireMock + recorded fixtures] |
-| [ADDITIONAL_DEPENDENCY] | [STRATEGY] | [TOOL] |
-
-### 9.3 Contract Testing Details
-
-| Consumer | Provider | Contract Location | Verification Trigger |
-|---------|---------|-------------------|---------------------|
-| [WEB_FRONTEND] | [SERVICE_A] | [e.g., Pact Broker at [URL] / GitHub repo] | [e.g., Provider CI pipeline runs contract verification on every PR] |
-| [SERVICE_B] | [SERVICE_A] | [e.g., Pact Broker at [URL]] | [e.g., Provider CI pipeline runs contract verification] |
-| [SERVICE_B] | [PAYMENT_PROVIDER] | [e.g., Specmatic spec in repo] | [e.g., Stub server verified against latest OpenAPI spec] |
-| [ADDITIONAL_CONSUMER] | [PROVIDER] | [CONTRACT_LOCATION] | [TRIGGER] |
+| PostgreSQL | Local PostgreSQL via Docker Compose; Prisma migrate for schema setup | Docker Compose + Prisma |
+| Microsoft Entra ID | Separate development app registration in Entra ID; test tenant | Development Entra ID tenant with test users |
+| Microsoft Graph API / SharePoint | Separate test SharePoint site in development M365 tenant | Manual testing with development SharePoint site |
+| Azure Blob Storage | Local filesystem or Azurite emulator (planned) | Azurite (planned) |
+| Azure Key Vault | Local .env file with same variable names | .env file (gitignored) |
 
 ---
 
 ## 10. Integration Monitoring and Observability
 
-### 10.1 Integration Health Dashboard
+### 10.1 Integration Health Monitoring
 
 | Metric | Source | Threshold (Warning) | Threshold (Critical) | Alert Channel |
 |--------|--------|--------------------|-----------------------|---------------|
-| API Gateway error rate (5xx) | Azure APIM Analytics | [e.g., > 1%] | [e.g., > 5%] | [e.g., PagerDuty + Teams] |
-| API Gateway latency (P95) | Azure APIM Analytics | [e.g., > 1s] | [e.g., > 3s] | [e.g., PagerDuty + Teams] |
-| Service Bus DLQ depth | Azure Service Bus Metrics | [e.g., > 0] | [e.g., > 100] | [e.g., Teams + Email] |
-| Service Bus active messages | Azure Service Bus Metrics | [e.g., > 10,000] | [e.g., > 50,000] | [e.g., PagerDuty + Teams] |
-| Circuit breaker state = Open | Application Insights custom metric | N/A | Open state | [e.g., PagerDuty + Teams] |
-| Third-party API error rate | Application Insights dependency tracking | [e.g., > 5%] | [e.g., > 15%] | [e.g., Teams + Email] |
-| Integration test failures | GitHub Actions | Any failure | N/A | [e.g., Teams + PR comment] |
-| [ADDITIONAL_METRIC] | [SOURCE] | [WARNING] | [CRITICAL] | [ALERT] |
+| API error rate (5xx responses) | Container Apps system logs / Log Analytics | > 1% of requests | > 5% of requests | Azure Monitor Alerts (planned) |
+| API response latency (P95) | Container Apps metrics | > 1s | > 3s | Azure Monitor Alerts (planned) |
+| Graph API error rate | Application logs (structured log of Graph API call failures) | > 10% of Graph API calls | > 25% of Graph API calls | Application logging (manual review currently) |
+| Entra ID auth failure rate | Application logs (structured log of auth failures) | > 5% of auth attempts | > 15% of auth attempts | Application logging (manual review currently) |
+| Database connection pool exhaustion | Prisma connection pool metrics (if exposed) | Pool utilization > 80% | Pool utilization > 95% or connection timeouts | Not yet monitored |
+| Container Apps replica count | Container Apps metrics | Sustained at max (3 replicas) | N/A | Indicates potential scaling need |
+
+**Note:** Alerting is not yet configured. Integration monitoring currently relies on manual review of Log Analytics queries. Azure Monitor Alerts configuration is planned as part of the operational maturity roadmap.
+
+### 10.2 Key Log Analytics Queries (KQL)
+
+```kql
+// Graph API error summary (last 24 hours)
+ContainerAppConsoleLogs_CL
+| where TimeGenerated > ago(24h)
+| where Log_s contains "Graph API" and Log_s contains "error"
+| summarize ErrorCount=count() by bin(TimeGenerated, 1h)
+| order by TimeGenerated desc
+
+// Authentication failure summary (last 24 hours)
+ContainerAppConsoleLogs_CL
+| where TimeGenerated > ago(24h)
+| where Log_s contains "auth" and (Log_s contains "failed" or Log_s contains "401")
+| summarize FailureCount=count() by bin(TimeGenerated, 1h)
+| order by TimeGenerated desc
+
+// API response time distribution (last 1 hour)
+ContainerAppConsoleLogs_CL
+| where TimeGenerated > ago(1h)
+| where Log_s contains "response_time"
+| extend ResponseTime = extract("response_time=([0-9]+)", 1, Log_s)
+| summarize P50=percentile(toint(ResponseTime), 50),
+            P95=percentile(toint(ResponseTime), 95),
+            P99=percentile(toint(ResponseTime), 99)
+```
 
 ---
 
@@ -321,5 +426,4 @@ This document defines the integration architecture for **[PROJECT_NAME]**. It de
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 0.1 | [YYYY-MM-DD] | [AUTHOR] | Initial draft |
-| [VERSION] | [YYYY-MM-DD] | [AUTHOR] | [CHANGES] |
+| 0.1 | 2026-02-14 | Solution Architect | Initial draft |

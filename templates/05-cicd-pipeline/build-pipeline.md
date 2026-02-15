@@ -2,20 +2,50 @@
 
 | **Page Title**   | Build Pipeline                             |
 |------------------|--------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                               |
-| **Status**       | [Draft / In Review / Approved / Deprecated] |
-| **Owner**        | [TEAM OR INDIVIDUAL NAME]                  |
+| **Last Updated** | 2026-02-14                                 |
+| **Status**       | In Review                                  |
+| **Owner**        | IntelliSecOps DevOps Team                  |
 
 ---
 
 ## 1. Build Workflow Diagram
 
-> **[INSERT BUILD WORKFLOW DIAGRAM HERE]**
->
-> Recommended tools: Mermaid (renders natively in GitHub), draw.io, or Lucidchart.
-> Export as PNG and attach to this Confluence page.
->
-> The diagram should illustrate the flow from code push through to artifact storage, including parallel jobs and conditional steps.
+```mermaid
+graph LR
+    A[Push / PR] --> B{CI Workflow Triggers}
+    B --> C[backend-ci]
+    B --> D[frontend-ci]
+    B --> E[security-scan]
+    B --> F[dependency-audit]
+
+    C --> C1[Checkout]
+    C1 --> C2[Setup Node.js 20]
+    C2 --> C3[npm ci]
+    C3 --> C4[prisma generate]
+    C4 --> C5[tsc --noEmit]
+    C5 --> C6[Lint]
+    C6 --> C7[Test]
+    C7 --> C8[Build]
+
+    D --> D1[Checkout]
+    D1 --> D2[Setup Node.js 20]
+    D2 --> D3[npm ci]
+    D3 --> D4[tsc --noEmit]
+    D4 --> D5[Lint]
+    D5 --> D6[Test]
+    D6 --> D7[Build with VITE_API_URL]
+
+    E --> E1[Checkout]
+    E1 --> E2[CodeQL Init javascript-typescript]
+    E2 --> E3[Autobuild]
+    E3 --> E4[CodeQL Analyze]
+
+    F --> F1[Checkout]
+    F1 --> F2[npm audit backend]
+    F2 --> F3[npm audit frontend]
+```
+
+> Export this Mermaid diagram as PNG and attach to the Confluence page for rendering.
 
 ---
 
@@ -23,65 +53,89 @@
 
 | Trigger Type    | Event                        | Branch/Path Filter                       | Condition / Notes                                 |
 |-----------------|------------------------------|------------------------------------------|---------------------------------------------------|
-| **Push**        | `push`                       | Branches: `main`, `develop`              | Runs full build + tests                           |
-| **Pull Request**| `pull_request`               | Branches: `main`, `develop`              | Runs build + tests; blocks merge on failure       |
-| **Schedule**    | `schedule` (cron)            | `cron: '[CRON-EXPRESSION]'`              | Nightly build to catch dependency drift           |
-| **Manual**      | `workflow_dispatch`          | Any branch                               | On-demand builds for debugging or hotfixes        |
-| **Path Filter** | (combined with push/PR)      | `paths: ['src/**', 'package.json', ...]` | Skip build when only docs or non-code files change |
+| **Pull Request**| `pull_request`               | Branches: `main`, `develop`              | Runs all 4 parallel CI jobs; blocks merge on failure |
+| **Push**        | `push`                       | Branches: `develop`                      | Runs full CI on integration branch                |
+| **Manual**      | Not configured               | N/A                                      | CI does not support manual dispatch currently     |
+| **Schedule**    | Not configured               | N/A                                      | No nightly builds configured yet                  |
 
 ---
 
 ## 3. Build Steps Breakdown
 
-| #  | Step                         | Action / Tool                          | Purpose                                                   | Timeout  |
-|----|------------------------------|----------------------------------------|-----------------------------------------------------------|----------|
-| 1  | Checkout code                | `actions/checkout@v4`                  | Clone repository with full history for versioning          | 2 min    |
-| 2  | Setup runtime                | `actions/setup-dotnet@v4` / `actions/setup-node@v4` / `actions/setup-python@v5` | Install required SDK/runtime version | 2 min    |
-| 3  | Restore dependency cache     | `actions/cache@v4`                     | Restore NuGet/npm/pip cache to speed up install            | 1 min    |
-| 4  | Install dependencies         | `dotnet restore` / `npm ci` / `pip install -r requirements.txt` | Install project dependencies              | 5 min    |
-| 5  | Lint / format check          | [LINTER-TOOL: e.g., `dotnet format --verify-no-changes`, `eslint`, `ruff`] | Enforce code style and catch syntax issues | 3 min    |
-| 6  | Build / compile              | `dotnet build` / `npm run build` / `python -m build` | Compile application artifacts              | 10 min   |
-| 7  | Run unit tests               | `dotnet test` / `npm test` / `pytest`  | Execute unit test suite and generate results               | 10 min   |
-| 8  | SAST scan                    | [SAST-TOOL: e.g., `github/codeql-action/analyze@v3`, `SonarSource/sonarcloud-github-action@v3`] | Static application security testing | 10 min   |
-| 9  | Generate code coverage       | [COVERAGE-TOOL: e.g., Coverlet, Istanbul/nyc, coverage.py] | Produce coverage report                    | 2 min    |
-| 10 | Publish test results         | `dorny/test-reporter@v1` or `actions/upload-artifact@v4` | Surface test results in PR checks          | 1 min    |
-| 11 | Build container image        | `docker/build-push-action@v6`          | Build Docker image (if containerized service)              | 10 min   |
-| 12 | Scan container image         | [SCANNER: e.g., `aquasecurity/trivy-action@0.28.0`] | Scan image for CVEs before publishing      | 5 min    |
-| 13 | Publish artifact             | `actions/upload-artifact@v4` / push to ACR | Upload build artifact or push image to Azure Container Registry | 3 min |
+### Job 1: backend-ci
+
+| #  | Step                         | Action / Tool                          | Purpose                                                   |
+|----|------------------------------|----------------------------------------|-----------------------------------------------------------|
+| 1  | Checkout code                | `actions/checkout@v4`                  | Clone repository                                          |
+| 2  | Setup Node.js                | `actions/setup-node@v4`                | Install Node.js 20                                        |
+| 3  | Install dependencies         | `npm ci`                               | Clean install of backend dependencies                     |
+| 4  | Generate Prisma client       | `npx prisma generate`                  | Generate Prisma ORM client from schema                    |
+| 5  | Type check                   | `tsc --noEmit`                         | TypeScript compilation check without emitting files       |
+| 6  | Lint                         | ESLint                                 | Enforce code style and catch issues                       |
+| 7  | Run tests                    | `npm test`                             | Execute test suite (if present)                           |
+| 8  | Build                        | `npm run build`                        | Compile TypeScript to JavaScript                          |
+
+### Job 2: frontend-ci
+
+| #  | Step                         | Action / Tool                          | Purpose                                                   |
+|----|------------------------------|----------------------------------------|-----------------------------------------------------------|
+| 1  | Checkout code                | `actions/checkout@v4`                  | Clone repository                                          |
+| 2  | Setup Node.js                | `actions/setup-node@v4`                | Install Node.js 20                                        |
+| 3  | Install dependencies         | `npm ci`                               | Clean install of frontend dependencies                    |
+| 4  | Type check                   | `tsc --noEmit`                         | TypeScript compilation check without emitting files       |
+| 5  | Lint                         | ESLint                                 | Enforce code style and catch issues                       |
+| 6  | Run tests                    | `npm test`                             | Execute test suite (if present)                           |
+| 7  | Build                        | `npm run build`                        | Vite production build (with `VITE_API_URL` env var set)   |
+
+### Job 3: security-scan
+
+| #  | Step                         | Action / Tool                          | Purpose                                                   |
+|----|------------------------------|----------------------------------------|-----------------------------------------------------------|
+| 1  | Checkout code                | `actions/checkout@v4`                  | Clone repository                                          |
+| 2  | Initialize CodeQL            | `github/codeql-action/init@v3`         | Initialize CodeQL for `javascript-typescript`             |
+| 3  | Autobuild                    | `github/codeql-action/autobuild@v3`   | Automatically detect and build the project                |
+| 4  | Perform CodeQL Analysis      | `github/codeql-action/analyze@v3`     | Run static analysis for security vulnerabilities          |
+
+### Job 4: dependency-audit
+
+| #  | Step                         | Action / Tool                          | Purpose                                                   |
+|----|------------------------------|----------------------------------------|-----------------------------------------------------------|
+| 1  | Checkout code                | `actions/checkout@v4`                  | Clone repository                                          |
+| 2  | Audit backend dependencies   | `npm audit --audit-level=high`         | Check backend packages for known vulnerabilities          |
+| 3  | Audit frontend dependencies  | `npm audit --audit-level=high`         | Check frontend packages for known vulnerabilities         |
 
 ---
 
 ## 4. Build Artifact Management
 
-| Artifact              | Format                  | Storage Location                    | Retention Policy     | Consumed By              |
-|-----------------------|-------------------------|-------------------------------------|----------------------|--------------------------|
-| Application package   | `.zip` / `.nupkg` / `.tar.gz` | GitHub Actions Artifacts       | [NUMBER] days        | Release pipeline         |
-| Container image       | OCI image               | Azure Container Registry (`[ACR-NAME].azurecr.io`) | [NUMBER] tags kept | AKS / App Service deploy |
-| Test results          | `.trx` / `.xml` / `.json` | GitHub Actions Artifacts          | [NUMBER] days        | PR checks, dashboards    |
-| Coverage report       | Cobertura XML / lcov    | GitHub Actions Artifacts            | [NUMBER] days        | Coverage gate, SonarCloud|
-| SBOM                  | SPDX / CycloneDX JSON  | GitHub Actions Artifacts / ACR      | [NUMBER] days        | Security team            |
+The CI workflow (`ci.yml`) does not produce persisted artifacts. Its purpose is validation only (type checking, linting, testing, security scanning). Deployable artifacts (Docker images) are produced by the CD workflow.
 
-### Artifact Naming Convention
+| Artifact              | Format                  | Storage Location                                    | Retention Policy     | Consumed By              |
+|-----------------------|-------------------------|-----------------------------------------------------|----------------------|--------------------------|
+| Backend Docker image  | OCI image               | Azure Container Registry (`acrcmmcassessorprod.azurecr.io`) | Latest + SHA tagged | CD deploy job            |
+| Frontend Docker image | OCI image               | Azure Container Registry (`acrcmmcassessorprod.azurecr.io`) | Latest + SHA tagged | CD deploy job            |
+| CodeQL SARIF results  | SARIF                   | GitHub Security tab                                 | Indefinite           | Security review          |
+
+### Artifact Naming Convention (Docker Images)
 
 ```
-[SERVICE-NAME]-[VERSION]-[SHORT-SHA].[EXTENSION]
+acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:<short-sha>
+acrcmmcassessorprod.azurecr.io/cmmc-assessor-backend:latest
+acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:<short-sha>
+acrcmmcassessorprod.azurecr.io/cmmc-assessor-frontend:latest
 ```
-
-Example: `order-api-1.4.2-a3f8c1d.zip`
 
 ---
 
 ## 5. Build Matrix
 
-Use a build matrix when the project must be validated across multiple runtimes, operating systems, or framework versions.
+The project does not currently use a build matrix. All CI jobs target a single configuration:
 
-| Axis              | Values                                     | Notes                                    |
-|-------------------|--------------------------------------------|------------------------------------------|
-| Runtime version   | [e.g., `dotnet: [8.0, 9.0]`, `node: [20, 22]`] | Ensure compatibility across supported versions |
-| Operating system  | [e.g., `ubuntu-latest`, `windows-latest`]  | Only if multi-OS deployment is required  |
-| Configuration     | [e.g., `Debug`, `Release`]                 | CI typically runs `Release` only         |
-
-> **Note:** Use `fail-fast: false` if you want all matrix combinations to complete even when one fails.
+| Axis              | Values                | Notes                                    |
+|-------------------|-----------------------|------------------------------------------|
+| Runtime version   | Node.js 20            | Single runtime version                   |
+| Operating system  | `ubuntu-latest`       | Linux only (matches production containers)|
+| Configuration     | Production build      | Single configuration                     |
 
 ---
 
@@ -89,21 +143,19 @@ Use a build matrix when the project must be validated across multiple runtimes, 
 
 | Metric                        | Current Value      | Target              | Notes                              |
 |-------------------------------|--------------------|---------------------|------------------------------------|
-| Total build time (CI)         | [CURRENT] min      | < [TARGET] min      | Measured on `ubuntu-latest` runner |
-| Dependency cache hit rate     | [CURRENT] %        | > 90%               | Track via cache action logs        |
-| Docker layer cache hit rate   | [CURRENT] %        | > 80%               | Use `cache-from` with ACR or GHCR  |
-| Unit test execution time      | [CURRENT] min      | < [TARGET] min      | Parallelise test assemblies if slow|
-| Artifact upload time          | [CURRENT] min      | < 1 min             |                                    |
-| Average queue wait time       | [CURRENT] min      | < 2 min             | May need larger runner pool        |
+| Total CI time (all jobs)      | ~5-8 min           | < 10 min            | 4 parallel jobs help keep total time low |
+| Dependency install (npm ci)   | ~1-2 min           | < 2 min             | Per job                            |
+| TypeScript type check         | ~30 sec            | < 1 min             | `tsc --noEmit`                     |
+| CodeQL analysis               | ~3-5 min           | < 5 min             | Longest-running job typically      |
+| Dependency audit              | ~30 sec            | < 1 min             | Fast npm audit checks              |
 
 ### Performance Optimization Checklist
 
-- [ ] Dependency caching enabled (`actions/cache`)
-- [ ] Docker layer caching enabled (BuildKit cache or registry cache)
-- [ ] Tests run in parallel where possible
-- [ ] Path filters skip unnecessary builds
-- [ ] Larger GitHub-hosted runners used for heavy builds (`ubuntu-latest-xl`)
-- [ ] Unnecessary steps removed or moved to nightly builds
+- [ ] Dependency caching enabled (`actions/cache` or `actions/setup-node` with cache)
+- [x] All 4 CI jobs run in parallel
+- [ ] Path filters to skip unnecessary builds (not yet configured)
+- [ ] Docker layer caching enabled (used in CD workflow with GHA cache)
+- [ ] Larger GitHub-hosted runners for heavy builds (not needed currently)
 
 ---
 
@@ -112,110 +164,102 @@ Use a build matrix when the project must be validated across multiple runtimes, 
 | Failure Type                  | Notification Channel          | Recipients                     | Escalation                          |
 |-------------------------------|-------------------------------|--------------------------------|-------------------------------------|
 | PR build failure              | GitHub PR status check        | PR author                      | None (author must fix)              |
-| `main` branch build failure   | [SLACK-CHANNEL / TEAMS-CHANNEL] | [TEAM-NAME]                 | Page on-call if not fixed in [X] hr |
-| Nightly build failure         | [SLACK-CHANNEL / TEAMS-CHANNEL] | [TEAM-NAME]                 | Triage in next standup              |
-| Security scan findings        | GitHub Security tab + [CHANNEL] | Security champion + [TEAM]  | Per severity SLA                    |
+| `develop` branch build failure| GitHub commit status           | Committer                     | Team reviews in next standup        |
+| Security scan findings        | GitHub Security tab           | Security champion + team       | Per severity SLA                    |
+| Dependency audit failure      | GitHub PR status check        | PR author                      | Must resolve high+ vulnerabilities  |
 
 ---
 
-## 8. Example GitHub Actions Build Workflow
+## 8. Example GitHub Actions CI Workflow
 
 ```yaml
-# .github/workflows/build.yml
-name: Build & Test
+# .github/workflows/ci.yml
+name: CI
 
 on:
-  push:
-    branches: [main, develop]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
   pull_request:
     branches: [main, develop]
-  schedule:
-    - cron: '[CRON-EXPRESSION]'   # e.g., '0 3 * * *' for nightly at 03:00 UTC
-  workflow_dispatch:
+  push:
+    branches: [develop]
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
   security-events: write
 
 env:
-  DOTNET_VERSION: '[DOTNET-VERSION]'       # e.g., '8.0.x'
-  NODE_VERSION: '[NODE-VERSION]'           # e.g., '20'
-  ARTIFACT_NAME: '[SERVICE-NAME]'
-  ACR_NAME: '[ACR-NAME]'
+  NODE_VERSION: '20'
 
 jobs:
-  build:
-    name: Build & Unit Test
+  backend-ci:
+    name: Backend CI
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    defaults:
+      run:
+        working-directory: ./backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0   # Full history for versioning tools
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: nuget-${{ runner.os }}-
+      - name: Generate Prisma client
+        run: npx prisma generate
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Type check
+        run: npx tsc --noEmit
 
-      - name: Check formatting
-        run: dotnet format --verify-no-changes --no-restore
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: npm run build
 
-      - name: Run unit tests
-        run: |
-          dotnet test --configuration Release --no-build \
-            --logger "trx;LogFileName=test-results.trx" \
-            --collect:"XPlat Code Coverage"
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    env:
+      VITE_API_URL: http://localhost:3001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        if: always()
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: Unit Tests
-          path: '**/test-results.trx'
-          reporter: dotnet-trx
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: '**/coverage.cobertura.xml'
-          retention-days: [RETENTION-DAYS]
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Publish application artifact
-        run: dotnet publish src/[PROJECT-NAME] -c Release -o ./publish
+      - name: Type check
+        run: npx tsc --noEmit
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ARTIFACT_NAME }}-${{ github.sha }}
-          path: ./publish
-          retention-days: [RETENTION-DAYS]
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
 
   security-scan:
-    name: SAST Scan
+    name: Security Scan (CodeQL)
     runs-on: ubuntu-latest
-    needs: build
+    permissions:
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -223,16 +267,27 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: '[LANGUAGE]'   # e.g., csharp, javascript, python
+          languages: javascript-typescript
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-```
 
-> **Note:** Replace all `[PLACEHOLDER]` values with project-specific settings before use.
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Audit backend dependencies
+        run: cd backend && npm audit --audit-level=high
+
+      - name: Audit frontend dependencies
+        run: cd frontend && npm audit --audit-level=high
+```
 
 ---
 

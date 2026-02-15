@@ -2,26 +2,24 @@
 
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
-| Page Title       | [PROJECT_NAME] - Architecture Overview (HLD)   |
-| Last Updated     | [YYYY-MM-DD]                                   |
-| Status           | `DRAFT` / `IN REVIEW` / `APPROVED`             |
-| Owner            | [OWNER_NAME]                                   |
-| Reviewers        | [REVIEWER_1], [REVIEWER_2], [REVIEWER_3]       |
-| Version          | [VERSION_NUMBER, e.g., 1.0]                    |
+| Page Title       | CMMC Assessor Platform - Architecture Overview (HLD) |
+| Last Updated     | 2026-02-14                                     |
+| Status           | `DRAFT`                                        |
+| Owner            | Solution Architect                             |
+| Reviewers        | Technical Lead, Security Architect, Engineering Manager |
+| Version          | 0.1                                            |
 
 ---
 
 ## 1. Document Purpose
 
-This document describes the high-level architecture for **[PROJECT_NAME]**. It establishes the architectural vision, guiding principles, technology choices, and Azure service mappings that govern the solution design. This document serves as the authoritative reference for all stakeholders involved in design, development, and operations.
+This document describes the high-level architecture for the **CMMC Assessor Platform**. It establishes the architectural vision, guiding principles, technology choices, and Azure service mappings that govern the solution design. This document serves as the authoritative reference for all stakeholders involved in design, development, and operations.
 
 ---
 
 ## 2. Architecture Vision
 
-[Provide a concise statement (2-4 sentences) describing the architectural vision. What does the architecture aim to achieve from a business and technical perspective?]
-
-**Example:** *The architecture for [PROJECT_NAME] is designed to deliver a cloud-native, highly available, and secure platform on Microsoft Azure. It prioritizes operational simplicity, horizontal scalability, and rapid feature delivery through a microservices-based approach with fully automated CI/CD pipelines.*
+The CMMC Assessor Platform is a multi-tenant SaaS application designed to streamline Cybersecurity Maturity Model Certification (CMMC) assessment workflows for defense industrial base organizations. The architecture delivers a cloud-native, cost-efficient platform on Microsoft Azure that prioritizes tenant data isolation, secure handling of Controlled Unclassified Information (CUI), and seamless integration with Microsoft 365 ecosystems via Entra ID and Graph API. The system is built for operational simplicity as an MVP, using serverless-like container hosting with scale-to-zero capabilities to minimize costs while maintaining the ability to scale horizontally under load.
 
 ---
 
@@ -29,13 +27,13 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | # | Principle | Rationale |
 |---|-----------|-----------|
-| 1 | Cloud-Native First | Leverage Azure PaaS services to reduce operational overhead and accelerate delivery. |
-| 2 | Automation Everywhere | All infrastructure, deployments, and testing must be automated via GitHub Actions and IaC. |
-| 3 | Security by Design | Security controls are embedded at every layer, not bolted on after the fact. |
-| 4 | Observability as a First-Class Concern | Every component must emit structured logs, metrics, and traces from day one. |
-| 5 | Loose Coupling, High Cohesion | Services communicate through well-defined contracts; internal complexity is encapsulated. |
-| 6 | [ADDITIONAL_PRINCIPLE] | [RATIONALE] |
-| 7 | [ADDITIONAL_PRINCIPLE] | [RATIONALE] |
+| 1 | Cloud-Native First | Leverage Azure PaaS and serverless-adjacent services (Container Apps) to reduce operational overhead and accelerate delivery. |
+| 2 | Automation Everywhere | All infrastructure, deployments, and testing are automated via GitHub Actions CI/CD with OIDC authentication and Bicep IaC. |
+| 3 | Security by Design | Security controls are embedded at every layer -- Entra ID authentication, tenant isolation middleware, AES-256-GCM token encryption, JWT deny lists, and RBAC enforcement. |
+| 4 | Tenant Data Isolation | Every database query is scoped to the authenticated tenant via Prisma ORM middleware, ensuring no cross-tenant data leakage. |
+| 5 | Simplicity for MVP | Favor simpler architectures (monolithic API, synchronous REST, client-side caching) over premature complexity (microservices, message brokers, distributed caching). |
+| 6 | Microsoft Ecosystem Alignment | Leverage Microsoft Entra ID, Graph API, and SharePoint to meet enterprise customer expectations and reduce custom authentication/storage development. |
+| 7 | Cost Optimization | Use scale-to-zero Container Apps, burstable database SKUs, and consumption-based pricing to keep MVP costs low while preserving scalability options. |
 
 ---
 
@@ -45,19 +43,19 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 <!--
     C4 Level 1 - System Context Diagram
     Show:
-    - The system under design as a central box
-    - External users/personas interacting with the system
-    - External systems the solution integrates with
-    - Communication protocols on the arrows
-    Recommended tool: draw.io, Lucidchart, or Structurizr
+    - CMMC Assessor Platform as the central system
+    - User personas (Assessors, Team Members, Platform Admins)
+    - External systems (Microsoft Entra ID, Microsoft Graph API / SharePoint, GoDaddy DNS)
 -->
 
 | Actor / External System | Description | Interaction |
 |--------------------------|-------------|-------------|
-| [USER_PERSONA_1]        | [DESCRIPTION] | [e.g., Accesses web portal via HTTPS] |
-| [USER_PERSONA_2]        | [DESCRIPTION] | [e.g., Consumes mobile API via HTTPS] |
-| [EXTERNAL_SYSTEM_1]     | [DESCRIPTION] | [e.g., Sends events via webhook] |
-| [EXTERNAL_SYSTEM_2]     | [DESCRIPTION] | [e.g., SFTP file exchange nightly] |
+| CMMC Assessor | Primary user who conducts CMMC assessments, scores controls, manages POA&Ms, and generates SSP documents | Accesses React SPA via HTTPS; authenticates through Microsoft Entra ID |
+| Team Member (OWNER, ADMIN, MEMBER, VIEWER) | Invited collaborators within a tenant who participate in assessments with role-based permissions | Accesses React SPA via HTTPS; invited via tenant invitation flow |
+| Platform Administrator (SUPER_ADMIN, SUPPORT) | System-wide administrators who manage tenants, users, and platform operations | Accesses admin features via the same SPA with elevated platform roles |
+| Microsoft Entra ID | Identity provider for OAuth 2.0 / OIDC authentication and admin consent flows | HTTPS -- OAuth 2.0 authorization code flow with PKCE; admin consent for tenant onboarding |
+| Microsoft Graph API (SharePoint) | Evidence document storage and retrieval via SharePoint document libraries | HTTPS REST -- upload, download, preview, and delete evidence files using delegated and application permissions |
+| GoDaddy DNS | DNS provider for custom domain CNAME records | Manual configuration -- CNAME records pointing custom domains to Azure Container Apps |
 
 ---
 
@@ -67,24 +65,20 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 <!--
     C4 Level 2 - Container Diagram
     Show:
-    - All deployable units (web apps, APIs, databases, message brokers, etc.)
-    - Technology choices annotated on each container
-    - Communication flows and protocols between containers
-    - Azure service boundaries
-    Recommended tool: draw.io, Lucidchart, or Structurizr
+    - React SPA (frontend container)
+    - Node.js/Express API (backend container)
+    - PostgreSQL database
+    - Azure Blob Storage
+    - External services (Entra ID, Graph API)
 -->
 
 | Container | Description | Technology | Azure Service |
 |-----------|-------------|------------|---------------|
-| [WEB_APP] | [DESCRIPTION] | [e.g., React 18, TypeScript] | Azure App Service |
-| [API_GATEWAY] | [DESCRIPTION] | [e.g., Azure API Management] | Azure API Management |
-| [BACKEND_API_1] | [DESCRIPTION] | [e.g., .NET 8 Web API] | AKS |
-| [BACKEND_API_2] | [DESCRIPTION] | [e.g., Node.js 20 Express] | AKS |
-| [WORKER_SERVICE] | [DESCRIPTION] | [e.g., .NET 8 Worker] | Azure Functions |
-| [DATABASE] | [DESCRIPTION] | [e.g., PostgreSQL 16] | Azure Database for PostgreSQL |
-| [MESSAGE_BROKER] | [DESCRIPTION] | [e.g., Azure Service Bus] | Azure Service Bus |
-| [CACHE] | [DESCRIPTION] | [e.g., Redis 7] | Azure Cache for Redis |
-| [BLOB_STORAGE] | [DESCRIPTION] | [e.g., Azure Blob Storage] | Azure Storage Account |
+| cmmc-web (Frontend SPA) | Single-page application serving the assessor UI, dashboard, assessment workflows, SPRS scoring, policy management, and SSP generation | React 18.3, TypeScript 5.6, Vite 5.4, Tailwind CSS 3.4, TanStack React Query 5.59, Recharts 2.13, React Router 6.27 | Azure Container Apps (Nginx-served static files, 0.25 CPU / 0.5Gi) |
+| cmmc-api (Backend API) | RESTful API handling authentication, tenant management, assessments, controls, objectives, scoring, POA&M, policies, SSP generation, and evidence management | Node.js 20, Express 4.21, TypeScript 5.6 (ESM), Prisma 5.22, @azure/msal-node 2.15, jsonwebtoken, helmet, express-rate-limit, express-validator | Azure Container Apps (0.5 CPU / 1Gi) |
+| PostgreSQL Database | Relational data store for all tenant data, user accounts, assessments, controls, policies, audit logs, and token management (22 tables) | PostgreSQL 17 via Prisma ORM | Azure Database for PostgreSQL Flexible Server (B1ms, 1 vCore, 2GB) |
+| Azure Blob Storage | File storage for uploaded evidence documents and generated exports | Azure Blob Storage (Standard_LRS) | Azure Storage Account (stcmmcassessorprod) |
+| Azure Key Vault | Centralized secrets management for database credentials, JWT signing keys, MSAL client secrets, and encryption keys | Azure Key Vault | Azure Key Vault (kv-cmmc-assessor-prod, Standard) |
 
 ---
 
@@ -92,20 +86,32 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Layer | Technology | Version | Justification |
 |-------|-----------|---------|---------------|
-| **Frontend** | [e.g., React] | [e.g., 18.x] | [e.g., Component-based UI, large ecosystem, team expertise] |
-| **Frontend Build** | [e.g., Vite] | [e.g., 5.x] | [e.g., Fast HMR, modern bundling] |
-| **Backend API** | [e.g., .NET / ASP.NET Core] | [e.g., 8.0] | [e.g., Enterprise-grade, high performance, strong typing] |
-| **Serverless Functions** | [e.g., Azure Functions (.NET)] | [e.g., v4 isolated] | [e.g., Event-driven processing, cost-efficient for sporadic workloads] |
-| **Container Orchestration** | [e.g., Kubernetes (AKS)] | [e.g., 1.29] | [e.g., Standardized container orchestration, auto-scaling] |
-| **Database (Relational)** | [e.g., PostgreSQL] | [e.g., 16] | [e.g., Open-source, JSONB support, mature ecosystem] |
-| **Database (NoSQL)** | [e.g., Azure Cosmos DB] | [e.g., N/A] | [e.g., Global distribution, multi-model support] |
-| **Caching** | [e.g., Redis] | [e.g., 7.x] | [e.g., In-memory performance, pub/sub capabilities] |
-| **Message Broker** | [e.g., Azure Service Bus] | [e.g., Premium] | [e.g., Enterprise messaging, dead-letter queues, sessions] |
-| **Search** | [e.g., Azure AI Search] | [e.g., N/A] | [e.g., Full-text search, faceted navigation] |
-| **CI/CD** | GitHub Actions | N/A | [e.g., Native GitHub integration, extensive marketplace] |
-| **IaC** | [e.g., Terraform / Bicep] | [e.g., 1.7.x / latest] | [e.g., Declarative, state management, multi-cloud (Terraform) or Azure-native (Bicep)] |
-| **Monitoring** | [e.g., Azure Monitor + Application Insights] | N/A | [e.g., Native Azure integration, distributed tracing] |
-| [ADDITIONAL_LAYER] | [TECHNOLOGY] | [VERSION] | [JUSTIFICATION] |
+| **Frontend Framework** | React | 18.3.1 | Component-based UI, large ecosystem, strong TypeScript support, team expertise |
+| **Frontend Language** | TypeScript | 5.6 | Static type safety, improved developer experience, catch errors at compile time |
+| **Frontend Build** | Vite | 5.4 | Fast HMR, modern ESM-based bundling, superior DX over Webpack |
+| **Frontend Styling** | Tailwind CSS | 3.4 | Utility-first CSS, rapid UI development, consistent design system, small bundle with purging |
+| **Client State / Caching** | TanStack React Query | 5.59 | Server state management, automatic cache invalidation, background refetching, reduces custom state management code |
+| **Charting** | Recharts | 2.13 | React-native charting library for SPRS score visualizations, assessment dashboards |
+| **Routing** | React Router | 6.27 | Standard React routing solution, nested routes, layout routes, protected route patterns |
+| **Icons** | Lucide React | Latest | Lightweight, tree-shakable icon set with consistent styling |
+| **HTTP Client** | Axios | Latest | Request/response interceptors for JWT token attachment and refresh, consistent error handling |
+| **Backend Runtime** | Node.js | 20 LTS | Non-blocking I/O suitable for API workloads, JavaScript/TypeScript ecosystem alignment with frontend |
+| **Backend Framework** | Express | 4.21 | Minimal, flexible HTTP framework with extensive middleware ecosystem |
+| **Backend Language** | TypeScript (ESM) | 5.6 | Type safety across full stack, ESM module system for modern imports |
+| **ORM** | Prisma | 5.22 | Type-safe database client, declarative schema, automated migrations, multi-tenant query scoping via middleware |
+| **Authentication Library** | @azure/msal-node | 2.15 | Official Microsoft library for Entra ID OAuth 2.0 / OIDC integration |
+| **JWT Handling** | jsonwebtoken | 9.0 | Industry-standard JWT signing and verification |
+| **API Security** | helmet + express-rate-limit | 8.1 / 8.2 | HTTP security headers (helmet) and rate limiting to prevent abuse |
+| **Input Validation** | express-validator | 7.2 | Request validation middleware with sanitization |
+| **Document Generation** | docx | 9.5 | Programmatic DOCX generation for System Security Plan (SSP) export |
+| **Spreadsheet** | xlsx | Latest | Excel import/export for assessment data and evidence tracking |
+| **File Upload** | multer | 2.0 | Multipart form data handling for evidence file uploads |
+| **Database** | PostgreSQL | 17 | Mature relational database, strong data integrity, JSONB support, Azure Flexible Server managed service |
+| **Container Hosting** | Azure Container Apps | Consumption | Serverless containers with scale-to-zero, simpler than AKS, built-in ingress, auto-scaling |
+| **Container Registry** | Azure Container Registry | Basic | Private Docker image storage, integrated with Container Apps |
+| **CI/CD** | GitHub Actions | N/A | Native GitHub integration, OIDC federation to Azure (no stored credentials), Bicep IaC deployment |
+| **IaC** | Bicep | Latest | Azure-native, declarative, first-class ARM template compilation, simpler than Terraform for Azure-only workloads |
+| **Logging** | Azure Log Analytics | PerGB2018 | Centralized log aggregation from Container Apps, 30-day retention |
 
 ---
 
@@ -113,14 +119,14 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Pattern | Where Applied | Description |
 |---------|---------------|-------------|
-| Microservices | Backend services | [e.g., Domain-bounded services deployed independently in AKS] |
-| API Gateway | Ingress layer | [e.g., Azure API Management fronts all public APIs, handles rate limiting, auth, and routing] |
-| Event-Driven Architecture | [COMPONENT(S)] | [e.g., Domain events published to Azure Service Bus for async processing] |
-| CQRS | [COMPONENT(S)] | [e.g., Separate read/write models for [DOMAIN_AREA] to optimize query performance] |
-| Saga / Choreography | [COMPONENT(S)] | [e.g., Distributed transaction management across [SERVICE_A] and [SERVICE_B]] |
-| Backend for Frontend (BFF) | [COMPONENT(S)] | [e.g., Dedicated API layer tailored for the web and mobile frontends] |
-| Strangler Fig | [COMPONENT(S)] | [e.g., Incremental migration from legacy [SYSTEM] via facade routing] |
-| [OPTIONAL] [ADDITIONAL_PATTERN] | [COMPONENT(S)] | [DESCRIPTION] |
+| Multi-Tenant SaaS | Entire application | Shared application instances with tenant data isolation enforced at the ORM query layer via Prisma middleware; every database query is scoped to the authenticated tenant's ID |
+| Layered / MVC Architecture | Backend API (cmmc-api) | Express routes delegate to controller functions, which call service layer logic, which interact with Prisma repositories; separation of concerns without microservice overhead |
+| Single-Page Application (SPA) | Frontend (cmmc-web) | React SPA with client-side routing via React Router; API calls managed through Axios with TanStack React Query for caching and state management |
+| Token-Based Authentication | Authentication layer | JWT access tokens issued after Entra ID OAuth flow; refresh tokens stored in DB with family-based rotation detection; JWT deny list for server-side revocation |
+| Synchronous REST API | All API communication | All 68+ endpoints are synchronous HTTP REST; no message broker or event-driven patterns; appropriate for current scale and complexity |
+| Role-Based Access Control (RBAC) | Authorization layer | Two-tier RBAC: platform roles (SUPER_ADMIN, SUPPORT, USER) and team roles (OWNER, ADMIN, ASSESSOR, MEMBER, VIEWER); enforced via Express middleware |
+| Middleware Pipeline | Backend request processing | Express middleware chain: CORS, helmet, rate limiting, cookie parsing, JWT verification, tenant isolation, role authorization, request validation, error handling |
+| Repository Pattern (via ORM) | Data access layer | Prisma ORM acts as the repository layer with typed queries, automatic tenant scoping, and migration-based schema management |
 
 ---
 
@@ -130,55 +136,59 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Aspect | Approach |
 |--------|----------|
-| Identity Provider | [e.g., Microsoft Entra ID (Azure AD)] |
-| Authentication Protocol | [e.g., OpenID Connect / OAuth 2.0] |
-| Token Format | [e.g., JWT (access tokens) issued by Entra ID] |
-| API Authorization | [e.g., Role-based access control (RBAC) enforced at API gateway and service level] |
-| Service-to-Service Auth | [e.g., Managed Identity with workload identity federation in AKS] |
-| User Roles | [e.g., Admin, Editor, Viewer -- defined in Entra ID App Roles] |
-| MFA Requirement | [e.g., Required for all administrative access] |
+| Identity Provider | Microsoft Entra ID (Azure AD) -- primary; legacy username/password as fallback |
+| Authentication Protocol | OAuth 2.0 Authorization Code Flow with PKCE (via OIDC) for Entra ID; JWT-based session management |
+| Token Format | Custom JWTs issued by the backend after Entra ID validation; configurable expiry (currently 7 days) |
+| Refresh Token Strategy | Refresh tokens stored in PostgreSQL with token family rotation detection; compromised family triggers full revocation |
+| API Authorization | Two-tier RBAC enforced at middleware level: platform roles (SUPER_ADMIN, SUPPORT, USER) and team roles (OWNER, ADMIN, ASSESSOR, MEMBER, VIEWER) |
+| Tenant Isolation | tenantAuth.ts middleware extracts tenant context from JWT and injects scoped Prisma client; all queries automatically filtered by tenantId |
+| Service-to-Service Auth | Backend authenticates to Microsoft Graph API using MSAL confidential client with client credentials; tokens encrypted with AES-256-GCM before database storage |
+| MFA Requirement | Inherited from Microsoft Entra ID tenant policies; platform does not manage MFA directly but relies on Entra ID Conditional Access |
+| Server-Side Logout | JWT deny list (TokenDenyList table) enables immediate token revocation without waiting for expiry |
 
 ### 8.2 Logging
 
 | Aspect | Approach |
 |--------|----------|
-| Logging Framework | [e.g., Serilog (.NET) / Winston (Node.js)] |
-| Log Sink | [e.g., Azure Monitor Logs (Log Analytics Workspace)] |
-| Log Format | [e.g., Structured JSON with correlation ID] |
-| Log Levels | [e.g., Verbose, Debug, Information, Warning, Error, Fatal] |
-| PII Handling | [e.g., PII fields are masked/excluded from logs] |
-| Retention | [e.g., 90 days hot, 1 year archive] |
+| Logging Framework | Console-based structured logging from Container Apps, aggregated by Azure Log Analytics |
+| Log Sink | Azure Log Analytics Workspace (log-cmmc-assessor-prod) |
+| Log Format | Container Apps stdout/stderr captured as ContainerAppConsoleLogs |
+| Log Levels | Error, Warning, Info, Debug |
+| PII Handling | User emails and names appear in audit logs by design (required for CMMC audit trail); no payment card data in the system |
+| Retention | 30 days in Log Analytics (current); to be reviewed for compliance requirements |
+| Audit Logging | Dedicated AuditLog table in PostgreSQL capturing entity changes, actor identity, timestamps, and change details for compliance |
 
 ### 8.3 Monitoring and Observability
 
 | Aspect | Approach |
 |--------|----------|
-| APM Tool | [e.g., Azure Application Insights] |
-| Metrics | [e.g., Custom metrics emitted via Application Insights SDK] |
-| Distributed Tracing | [e.g., OpenTelemetry with Application Insights exporter] |
-| Dashboards | [e.g., Azure Workbooks + Grafana for operational dashboards] |
-| Alerting | [e.g., Azure Monitor Alerts -> Action Groups -> PagerDuty / Teams / Email] |
-| Health Checks | [e.g., /healthz and /readyz endpoints on all services, integrated with AKS probes] |
-| SLI/SLO Tracking | [e.g., Availability > 99.9%, P95 latency < 500ms, Error rate < 0.1%] |
+| APM Tool | Azure Log Analytics with Container Apps built-in metrics |
+| Metrics | Container Apps system metrics (CPU, memory, request count, response time); custom application metrics via structured logging |
+| Distributed Tracing | Not yet implemented; planned for future phases |
+| Dashboards | Azure Portal Container Apps overview dashboard; Log Analytics queries for custom views |
+| Alerting | To be configured via Azure Monitor Alerts (planned) |
+| Health Checks | Container Apps built-in health probes |
+| SLI/SLO Tracking | Not yet formalized; target availability > 99.5% for production |
 
 ### 8.4 Configuration Management
 
 | Aspect | Approach |
 |--------|----------|
-| Application Configuration | [e.g., Azure App Configuration] |
-| Feature Flags | [e.g., Azure App Configuration Feature Manager / LaunchDarkly] |
-| Environment-Specific Config | [e.g., Managed via Terraform/Bicep per environment, injected as env vars or mounted volumes] |
-| Configuration Refresh | [e.g., Sentinel key polling every 30s for dynamic config updates without restart] |
+| Application Configuration | Environment variables injected into Container Apps at deployment time |
+| Feature Flags | Not currently implemented; feature toggling managed via deployment branches |
+| Environment-Specific Config | Managed via Bicep IaC parameters per environment; secrets referenced from Key Vault |
+| Configuration Refresh | Requires container restart for env var changes; Key Vault secret references refreshed on container restart |
 
 ### 8.5 Secret Management
 
 | Aspect | Approach |
 |--------|----------|
-| Secret Store | [e.g., Azure Key Vault] |
-| Access Method | [e.g., Managed Identity (system-assigned) with Key Vault references in App Service / AKS CSI driver] |
-| Secret Rotation | [e.g., Automated rotation via Azure Key Vault rotation policies, 90-day cycle] |
-| CI/CD Secrets | [e.g., GitHub Actions secrets synced from Key Vault via OIDC federation] |
-| Local Development | [e.g., dotnet user-secrets / .env files (gitignored)] |
+| Secret Store | Azure Key Vault (kv-cmmc-assessor-prod) |
+| Access Method | Container Apps secret references to Key Vault; OIDC federation for GitHub Actions CI/CD |
+| Secret Rotation | Manual rotation currently; automated rotation planned as part of security remediation |
+| CI/CD Secrets | GitHub Actions OIDC federation to Azure -- no stored credentials for deployment; GitHub repository secrets for build-time values |
+| Local Development | .env files (gitignored) for local configuration |
+| Graph API Tokens | Microsoft Graph API access/refresh tokens encrypted with AES-256-GCM before storage in PostgreSQL UserToken table |
 
 ---
 
@@ -186,23 +196,14 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Component | Azure Service | SKU / Tier | Region | Justification |
 |-----------|--------------|------------|--------|---------------|
-| Container Orchestration | Azure Kubernetes Service (AKS) | [e.g., Standard, D4s_v5 nodes] | [e.g., West Europe] | [e.g., Managed K8s, auto-scaling, workload identity support] |
-| Web Frontend Hosting | Azure App Service | [e.g., Premium v3 P1v3] | [e.g., West Europe] | [e.g., Managed hosting with deployment slots, auto-scale] |
-| Serverless Processing | Azure Functions | [e.g., Premium EP1] | [e.g., West Europe] | [e.g., Event-driven processing, VNet integration] |
-| VM Workloads | Azure Virtual Machines | [e.g., Standard_D4s_v5] | [e.g., West Europe] | [e.g., Legacy component requiring full OS access] |
-| API Management | Azure API Management | [e.g., Standard v2] | [e.g., West Europe] | [e.g., API gateway, rate limiting, developer portal] |
-| Relational Database | Azure Database for PostgreSQL | [e.g., Flexible Server, GP D4s_v3] | [e.g., West Europe] | [e.g., Managed PostgreSQL, HA with zone redundancy] |
-| NoSQL Database | Azure Cosmos DB | [e.g., Serverless / Provisioned] | [e.g., West Europe] | [e.g., Low-latency reads, automatic indexing] |
-| Caching | Azure Cache for Redis | [e.g., Premium P1] | [e.g., West Europe] | [e.g., Sub-millisecond latency, data persistence] |
-| Messaging | Azure Service Bus | [e.g., Premium] | [e.g., West Europe] | [e.g., Enterprise messaging with sessions, dead-lettering] |
-| Event Streaming | Azure Event Hubs | [e.g., Standard] | [e.g., West Europe] | [e.g., High-throughput event ingestion] |
-| Storage | Azure Storage Account | [e.g., Standard LRS / GRS] | [e.g., West Europe] | [e.g., Blob storage for documents, queue storage for lightweight messaging] |
-| Key Vault | Azure Key Vault | [e.g., Standard] | [e.g., West Europe] | [e.g., Centralized secret, key, and certificate management] |
-| Monitoring | Azure Monitor + App Insights | [e.g., Pay-as-you-go] | [e.g., West Europe] | [e.g., Unified observability platform] |
-| Networking | Azure Virtual Network | [e.g., /16 address space] | [e.g., West Europe] | [e.g., Network isolation, NSGs, private endpoints] |
-| DNS | Azure DNS / Private DNS Zones | N/A | [e.g., Global] | [e.g., DNS resolution for private endpoints] |
-| WAF / CDN | Azure Front Door | [e.g., Premium] | Global | [e.g., Global load balancing, WAF, CDN] |
-| [ADDITIONAL_SERVICE] | [AZURE_SERVICE] | [SKU] | [REGION] | [JUSTIFICATION] |
+| Backend API | Azure Container Apps (cmmc-api) | Consumption (0.5 CPU, 1Gi memory) | Canada Central | Serverless containers with scale-to-zero; auto-scaling 0-3 replicas based on HTTP concurrency (50); Single Active Revision mode; simpler and cheaper than AKS for MVP |
+| Frontend SPA | Azure Container Apps (cmmc-web) | Consumption (0.25 CPU, 0.5Gi memory) | Canada Central | Nginx-served static React build; auto-scaling 0-3 replicas based on HTTP concurrency (100); co-located with backend in same Container Apps Environment |
+| Container Hosting Environment | Azure Container Apps Environment (cae-cmmc-assessor-prod) | Consumption | Canada Central | Shared hosting environment for frontend and backend containers; managed networking and observability |
+| Container Registry | Azure Container Registry (acrcmmcassessorprod) | Basic | Canada Central | Private Docker image storage for frontend and backend images; integrated with Container Apps for deployment |
+| Relational Database | Azure Database for PostgreSQL Flexible Server (psql-cmmc-assessor-prod) | B1ms (1 vCore, 2GB RAM) | Canada Central | Managed PostgreSQL 17; burstable SKU appropriate for MVP traffic; automated backups; Prisma ORM compatibility |
+| Secret Management | Azure Key Vault (kv-cmmc-assessor-prod) | Standard | Canada Central | Centralized secret storage for database connection strings, JWT signing keys, MSAL client secrets, encryption keys |
+| File Storage | Azure Storage Account (stcmmcassessorprod) | Standard_LRS | Canada Central | Evidence file storage; locally redundant storage sufficient for MVP (upgrade to GRS planned) |
+| Logging and Monitoring | Azure Log Analytics (log-cmmc-assessor-prod) | PerGB2018 | Canada Central | Centralized log aggregation from Container Apps; 30-day retention; KQL query support for troubleshooting |
 
 ---
 
@@ -210,15 +211,14 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Quality Attribute | Requirement | How Achieved |
 |-------------------|-------------|--------------|
-| **Performance** | [e.g., API response time P95 < 500ms under normal load] | [e.g., Redis caching, optimized DB queries, CDN for static assets, AKS pod auto-scaling] |
-| **Scalability** | [e.g., Support 10,000 concurrent users, scale to 50,000 during peak] | [e.g., AKS horizontal pod autoscaler, Azure Functions consumption scaling, read replicas for DB] |
-| **Availability** | [e.g., 99.95% uptime SLA for production] | [e.g., Multi-AZ deployments, AKS zone-redundant node pools, Azure SQL HA, health probes + auto-restart] |
-| **Security** | [e.g., Zero trust network, all data encrypted, SOC 2 compliance] | [e.g., Private endpoints, NSGs, mTLS between services, Azure Key Vault, Entra ID RBAC, Defender for Cloud] |
-| **Maintainability** | [e.g., New developers productive within 1 week, deploy any service independently] | [e.g., Modular microservices, comprehensive documentation, standardized project templates, automated CI/CD] |
-| **Reliability** | [e.g., Graceful degradation under partial failure, no data loss] | [e.g., Circuit breakers, retry policies, dead-letter queues, geo-redundant backups] |
-| **Observability** | [e.g., Mean time to detect (MTTD) < 5 minutes for P1 incidents] | [e.g., Centralized logging, distributed tracing, proactive alerting, SLO dashboards] |
-| **Compliance** | [e.g., GDPR, ISO 27001, SOC 2 Type II] | [e.g., Data residency in EU, encryption at rest/in transit, audit logging, DPA with all processors] |
-| [ADDITIONAL_ATTRIBUTE] | [REQUIREMENT] | [HOW_ACHIEVED] |
+| **Performance** | API response time P95 < 1s for standard CRUD operations; dashboard aggregations < 3s | Prisma query optimization, TanStack React Query client-side caching, efficient PostgreSQL indexes |
+| **Scalability** | Support up to 50 concurrent assessors in MVP phase; scale to 200+ with SKU upgrades | Container Apps auto-scaling 0-3 replicas based on HTTP concurrency thresholds; PostgreSQL SKU upgrade path (B1ms to GP-tier) |
+| **Availability** | 99.5% uptime target for production | Azure Container Apps managed infrastructure with automatic health checks and restart; PostgreSQL Flexible Server with automated failover capability |
+| **Security** | Tenant data isolation, CUI-appropriate handling, CMMC-aligned security controls | Prisma middleware tenant scoping, Entra ID authentication with inherited MFA, AES-256-GCM token encryption, JWT deny list, helmet security headers, express-rate-limit, input validation via express-validator |
+| **Maintainability** | Single codebase deployable by small team; new developers productive within 1 week | Monorepo structure, TypeScript full stack, Prisma schema as single source of truth for data model, Bicep IaC, automated CI/CD |
+| **Reliability** | No data loss for assessment data; graceful error handling for Graph API failures | PostgreSQL automated backups (7-day PITR, upgrading to 35-day), Express error middleware with consistent error responses, Axios interceptors for token refresh |
+| **Compliance** | CMMC assessment platform must demonstrate security practices consistent with CMMC Level 2 | Audit logging (AuditLog table), RBAC enforcement, data encryption at rest and in transit, tenant isolation, evidence management via SharePoint integration |
+| **Data Residency** | All data must reside within Canada | All Azure services deployed to Canada Central region; no cross-border data transfer except to Microsoft Entra ID and Graph API (governed by Microsoft DPA) |
 
 ---
 
@@ -226,11 +226,12 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | # | Constraint | Impact |
 |---|-----------|--------|
-| 1 | [e.g., All data must reside within the EU (GDPR)] | [e.g., Limits Azure region selection to West Europe / North Europe] |
-| 2 | [e.g., Must integrate with existing on-premises Active Directory] | [e.g., Requires hybrid identity setup with Entra ID Connect] |
-| 3 | [e.g., Budget cap of $X/month for Azure consumption] | [e.g., Constrains SKU/tier selections, favors serverless where possible] |
-| 4 | [e.g., Must use corporate standard GitHub Enterprise for source control] | [e.g., CI/CD tooling limited to GitHub Actions] |
-| 5 | [ADDITIONAL_CONSTRAINT] | [IMPACT] |
+| 1 | All Azure resources must be deployed to Canada Central region for data residency compliance | Limits service availability to Canada Central offerings; some Azure preview features may not be available |
+| 2 | Must integrate with Microsoft Entra ID for enterprise SSO; no custom identity store for primary auth | Architecture depends on Microsoft identity platform; requires admin consent flow for tenant onboarding |
+| 3 | MVP budget constrains infrastructure to burstable/consumption SKUs | Database limited to B1ms (1 vCore, 2GB); Container Apps on consumption plan; no Redis cache or CDN |
+| 4 | Small development team (1-3 developers) | Favors monolithic architecture over microservices; limits operational complexity tolerance; single repository for backend and frontend |
+| 5 | SharePoint is the mandated evidence storage platform (client requirement) | Requires Microsoft Graph API integration with incremental consent; evidence management depends on SharePoint availability and permissions |
+| 6 | 47 security findings identified (4 Critical, 10 High) requiring remediation over 6 months | Architecture decisions must account for security hardening roadmap; some features deferred pending security fixes |
 
 ---
 
@@ -238,11 +239,12 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | # | Assumption | If Invalid |
 |---|-----------|------------|
-| 1 | [e.g., Microsoft Entra ID is the sole identity provider for all users] | [e.g., Additional IdP federation configuration required] |
-| 2 | [e.g., Peak traffic will not exceed 50,000 concurrent users in Year 1] | [e.g., Architecture review needed for scaling strategy] |
-| 3 | [e.g., The team has production experience with Kubernetes and AKS] | [e.g., Additional training and ramp-up time required] |
-| 4 | [e.g., Third-party API [X] will maintain backward compatibility for 12 months] | [e.g., Adapter/anti-corruption layer may need more frequent updates] |
-| 5 | [ADDITIONAL_ASSUMPTION] | [IF_INVALID] |
+| 1 | Microsoft Entra ID is the primary identity provider for all production users | Legacy username/password auth exists as fallback; if Entra ID is not available, assess migration strategy for legacy accounts |
+| 2 | Peak concurrent usage will not exceed 50 users in Year 1 | PostgreSQL B1ms SKU and Container Apps 0-3 replica scaling may be insufficient; upgrade to GP-tier database and increase max replicas |
+| 3 | SharePoint document libraries are pre-provisioned by tenant administrators before evidence upload | If not, the application must guide users through SharePoint site creation or provide alternative evidence storage |
+| 4 | The team has production experience with Node.js, TypeScript, React, and PostgreSQL | If not, additional training and ramp-up time required; architecture choices may need revisiting |
+| 5 | Tenants will onboard via Microsoft Entra ID admin consent flow | If tenants cannot grant admin consent (restrictive IT policies), alternative onboarding flows needed |
+| 6 | Single-region deployment (Canada Central) is sufficient; no DR failover to secondary region required for MVP | If regional failover is required, architecture must add geo-redundant database, multi-region Container Apps, and traffic manager |
 
 ---
 
@@ -250,11 +252,11 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Role | Name | Date | Signature / Approval |
 |------|------|------|----------------------|
-| Solution Architect | [NAME] | [YYYY-MM-DD] | [ ] Approved |
-| Technical Lead | [NAME] | [YYYY-MM-DD] | [ ] Approved |
-| Security Architect | [NAME] | [YYYY-MM-DD] | [ ] Approved |
-| Engineering Manager | [NAME] | [YYYY-MM-DD] | [ ] Approved |
-| Product Owner | [NAME] | [YYYY-MM-DD] | [ ] Approved |
+| Solution Architect | ___________________ | __________ | [ ] Approved |
+| Technical Lead | ___________________ | __________ | [ ] Approved |
+| Security Architect | ___________________ | __________ | [ ] Approved |
+| Engineering Manager | ___________________ | __________ | [ ] Approved |
+| Product Owner | ___________________ | __________ | [ ] Approved |
 
 ---
 
@@ -262,5 +264,4 @@ This document describes the high-level architecture for **[PROJECT_NAME]**. It e
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 0.1 | [YYYY-MM-DD] | [AUTHOR] | Initial draft |
-| [VERSION] | [YYYY-MM-DD] | [AUTHOR] | [CHANGES] |
+| 0.1 | 2026-02-14 | Solution Architect | Initial draft |

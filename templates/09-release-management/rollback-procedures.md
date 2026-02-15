@@ -3,15 +3,15 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Rollback Procedures                |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Approved]     |
-| Owner            | [TEAM OR INDIVIDUAL NAME]          |
+| Last Updated     | 2026-02-14                         |
+| Status           | Draft                              |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the rollback procedures for all deployment types within the [PROJECT NAME] platform on Azure. It covers when to roll back versus roll forward, who can authorize a rollback, step-by-step procedures for each service type (App Service, AKS, Azure Functions, VMs, databases, and infrastructure), verification steps, and post-rollback processes.
+This document defines the rollback procedures for all deployment types within the CMMC Assessor Platform on Azure. It covers when to roll back versus roll forward, who can authorize a rollback, step-by-step procedures for Container Apps revision rollback, database rollback (Prisma), infrastructure rollback (Bicep), verification steps, and post-rollback processes.
 
 ---
 
@@ -22,18 +22,21 @@ This document defines the rollback procedures for all deployment types within th
 | Scenario                                          | Decision        | Rationale                                                    |
 |---------------------------------------------------|-----------------|--------------------------------------------------------------|
 | New deployment introduces a critical bug           | **Roll Back**   | Fastest path to restore service; fix can come later          |
-| Deployment causes partial outage (>10% of users)  | **Roll Back**   | Blast radius too large; restore previous stable version      |
+| Deployment causes complete outage                  | **Roll Back**   | Restore previous stable version immediately                  |
 | Performance degradation >50% from baseline         | **Roll Back**   | Unacceptable user experience; investigate offline            |
 | Data corruption detected                           | **Roll Back**   | Prevent further data damage; restore from backup if needed   |
-| Minor bug affecting <1% of users with workaround   | **Roll Forward** | Impact is contained; faster to deploy a hotfix               |
+| Minor bug affecting <5% of users with workaround   | **Roll Forward** | Impact is contained; faster to deploy a hotfix               |
 | Fix is identified and can be deployed in <30 min   | **Roll Forward** | Fix is quicker than rollback process                         |
-| Database migration is irreversible                 | **Roll Forward** | Rollback is not possible; must fix forward                   |
-| [SCENARIO]                                        | [DECISION]      | [RATIONALE]                                                  |
+| Prisma migration is irreversible (destructive)     | **Roll Forward** | Rollback is not possible for the database; must fix forward  |
 
 ### 2.2 Rollback Decision Flowchart
 
 ```
 Is the deployment causing data corruption?
+  YES -> ROLL BACK IMMEDIATELY (also restore DB if needed)
+  NO  -> Continue
+
+Is the platform completely inaccessible?
   YES -> ROLL BACK IMMEDIATELY
   NO  -> Continue
 
@@ -44,7 +47,7 @@ Is >10% of users impacted?
   NO  -> Continue
 
 Is there a workaround?
-  YES -> ROLL FORWARD (deploy hotfix in next cycle)
+  YES -> ROLL FORWARD (deploy hotfix)
   NO  -> Can we fix in <30 minutes?
     YES -> ROLL FORWARD
     NO  -> ROLL BACK
@@ -56,13 +59,12 @@ Is there a workaround?
 
 | Decision Type                  | Authorized By                          | Notification Required                    |
 |--------------------------------|----------------------------------------|------------------------------------------|
-| Standard rollback (SEV 3/4)    | [On-Call Engineer + Team Lead]         | [Slack notification to #deployments]     |
-| Urgent rollback (SEV 1/2)      | [On-Call Engineer (immediate, inform later)] | [Page SRE Lead + Incident Commander] |
-| Rollback during change freeze  | [VP Engineering]                       | [Email to engineering-leads DL]          |
-| Database rollback               | [DBA + Engineering Lead]              | [Slack + Email to data team]             |
-| Infrastructure rollback         | [SRE Lead + Engineering Lead]         | [Slack + Email to infrastructure team]   |
+| Standard rollback              | Any engineer with Azure access         | Notify team lead                         |
+| Urgent rollback (SEV 1/2)      | Any engineer (immediate, inform later) | Notify team lead after action            |
+| Database rollback               | Engineer with DB access                | Notify team lead before action           |
+| Infrastructure rollback         | Engineer with Azure access             | Notify team lead before action           |
 
-**Important:** During a SEV 1 incident, the on-call engineer is authorized to initiate a rollback immediately without waiting for approval. Approvals can be obtained retroactively.
+**Important:** During a SEV 1 incident, any engineer with access is authorized to initiate a rollback immediately without waiting for approval. Approvals can be obtained retroactively.
 
 ---
 
@@ -70,190 +72,128 @@ Is there a workaround?
 
 ---
 
-### 4.1 App Service Rollback
+### 4.1 Container Apps Rollback (Primary Method)
 
-#### Method A: Deployment Slot Swap Back (Preferred)
+Container Apps uses a single-revision mode. Rollback is achieved by redeploying a previous container image.
+
+#### Method A: Redeploy Previous Image via Azure CLI (Preferred)
 
 **Prerequisites:**
-- [ ] Previous version still running in the staging slot
-- [ ] Slot swap is the deployment method used for the current release
+- [ ] Azure CLI installed and logged in (`az login`)
+- [ ] Previous container image tag identified in ACR (acrcmmcassessorprod)
 
 **Steps:**
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Verify the staging slot still has the previous version                    | `az webapp deployment slot list --name [APP_NAME] --resource-group [RG_NAME]` |
-| 2    | Check staging slot health                                                 | `curl https://[APP_NAME]-staging.azurewebsites.net/health`                   |
-| 3    | Swap production back to staging slot                                      | `az webapp deployment slot swap --name [APP_NAME] --resource-group [RG_NAME] --slot staging --target-slot production` |
-| 4    | Verify production is now running previous version                         | `curl https://[APP_NAME].azurewebsites.net/health` -- check version in response |
-| 5    | Monitor Application Insights for 15 minutes                              | Verify error rates return to baseline                                        |
-
-**Estimated Time:** 2-5 minutes
-
-#### Method B: Redeploy Previous Version
-
-**Prerequisites:**
-- [ ] Previous deployment artifact available in GitHub Actions / artifact storage
-- [ ] Previous version tag identified in Git
-
-**Steps:**
-
-| Step | Action                                                                    | Command / Instructions                                                       |
-|------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Identify previous version Git tag                                         | `git tag --sort=-version:refname \| head -5`                                |
-| 2    | Trigger GitHub Actions deployment with previous version                   | Re-run deployment workflow with tag `[PREVIOUS_VERSION_TAG]`                 |
-| 3    | Alternatively, deploy from CLI                                            | `az webapp deployment source config-zip --name [APP_NAME] --resource-group [RG_NAME] --src [PREVIOUS_ARTIFACT_PATH]` |
-| 4    | Verify deployment succeeded                                               | Check health endpoint and Application Insights                               |
-| 5    | Monitor for 15 minutes                                                    | Verify error rates return to baseline                                        |
-
-**Estimated Time:** 5-15 minutes
-
----
-
-### 4.2 AKS Rollback
-
-#### Method A: Helm Rollback (Preferred for Helm-managed deployments)
-
-**Prerequisites:**
-- [ ] `kubectl` configured for the target AKS cluster
-- [ ] Helm release history available
-
-**Steps:**
-
-| Step | Action                                                                    | Command / Instructions                                                       |
-|------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Connect to the AKS cluster                                               | `az aks get-credentials --name [AKS_NAME] --resource-group [RG_NAME]`        |
-| 2    | List Helm release history                                                 | `helm history [RELEASE_NAME] -n [NAMESPACE]`                                |
-| 3    | Identify the target revision number to roll back to                       | Note the revision number of the last known good release                      |
-| 4    | Execute Helm rollback                                                     | `helm rollback [RELEASE_NAME] [REVISION_NUMBER] -n [NAMESPACE]`             |
-| 5    | Verify rollback succeeded                                                 | `helm status [RELEASE_NAME] -n [NAMESPACE]`                                 |
-| 6    | Check pod status                                                          | `kubectl get pods -n [NAMESPACE] -l app=[APP_LABEL]`                         |
-| 7    | Verify pods are running the previous image                                | `kubectl describe pod -n [NAMESPACE] -l app=[APP_LABEL] \| grep Image`      |
-| 8    | Check health endpoints                                                    | `curl https://[SERVICE_URL]/health`                                          |
-| 9    | Monitor for 15 minutes                                                    | Verify error rates return to baseline in Application Insights                |
+| 1    | List available image tags in ACR (backend API)                            | `az acr repository show-tags --name acrcmmcassessorprod --repository cmmc-api --orderby time_desc --output table` |
+| 2    | List available image tags in ACR (frontend)                               | `az acr repository show-tags --name acrcmmcassessorprod --repository cmmc-web --orderby time_desc --output table` |
+| 3    | Identify the previous known-good image tag                                | Note the tag from before the problematic deployment                          |
+| 4    | Roll back backend API to previous image                                   | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --image acrcmmcassessorprod.azurecr.io/cmmc-api:<PREVIOUS_TAG>` |
+| 5    | Roll back frontend to previous image                                      | `az containerapp update --name cmmc-web --resource-group rg-cmmc-assessor-prod --image acrcmmcassessorprod.azurecr.io/cmmc-web:<PREVIOUS_TAG>` |
+| 6    | Verify new revision is active                                             | `az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod -o table` |
+| 7    | Verify health endpoint                                                    | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
+| 8    | Verify frontend is accessible                                             | `curl -s -o /dev/null -w "%{http_code}" https://cmmc.intellisecops.com`      |
+| 9    | Monitor Log Analytics for 15 minutes                                      | Check for errors: `ContainerAppConsoleLogs_CL \| where ContainerAppName_s == "cmmc-api" \| where TimeGenerated > ago(15m) \| where Log_s contains "error"` |
 
 **Estimated Time:** 5-10 minutes
 
-#### Method B: kubectl Rollout Undo
+#### Method B: Redeploy via GitHub Actions Workflow Dispatch
 
 **Prerequisites:**
-- [ ] `kubectl` configured for the target AKS cluster
-- [ ] Deployment managed via `kubectl` (not Helm)
+- [ ] Access to the GitHub repository
+- [ ] Workflow dispatch is enabled on the CD workflow
 
 **Steps:**
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Connect to the AKS cluster                                               | `az aks get-credentials --name [AKS_NAME] --resource-group [RG_NAME]`        |
-| 2    | Check rollout history                                                     | `kubectl rollout history deployment/[DEPLOYMENT_NAME] -n [NAMESPACE]`        |
-| 3    | Undo the last rollout                                                     | `kubectl rollout undo deployment/[DEPLOYMENT_NAME] -n [NAMESPACE]`           |
-| 4    | Or, undo to a specific revision                                           | `kubectl rollout undo deployment/[DEPLOYMENT_NAME] -n [NAMESPACE] --to-revision=[REV]` |
-| 5    | Verify rollout status                                                     | `kubectl rollout status deployment/[DEPLOYMENT_NAME] -n [NAMESPACE]`         |
-| 6    | Verify pods are healthy                                                   | `kubectl get pods -n [NAMESPACE] -l app=[APP_LABEL]`                         |
-| 7    | Check health endpoints and monitor                                        | `curl https://[SERVICE_URL]/health`                                          |
+| 1    | Go to GitHub repository > Actions tab                                     | Navigate to the CD workflow                                                  |
+| 2    | Click "Run workflow"                                                      | Select the main branch or input the previous commit SHA / tag                |
+| 3    | Wait for the workflow to complete                                         | Monitor GitHub Actions logs                                                  |
+| 4    | Verify deployment                                                         | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
+| 5    | Monitor for 15 minutes                                                    | Check Log Analytics for errors                                               |
 
-**Estimated Time:** 3-7 minutes
+**Estimated Time:** 10-15 minutes (includes CI/CD pipeline time)
 
----
-
-### 4.3 Azure Functions Rollback
-
-#### Redeploy Previous Package
+#### Method C: Revert Git Commit and Push
 
 **Prerequisites:**
-- [ ] Previous deployment package available in artifact storage
-- [ ] Previous version identified
+- [ ] Git repository cloned locally
+- [ ] Ability to push to main branch
 
 **Steps:**
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Identify previous version to deploy                                       | Check GitHub Actions run history or artifact storage                          |
-| 2    | Stop the Function App (optional, prevents processing during deploy)       | `az functionapp stop --name [FUNC_NAME] --resource-group [RG_NAME]`          |
-| 3    | Deploy previous version package                                           | `az functionapp deployment source config-zip --name [FUNC_NAME] --resource-group [RG_NAME] --src [PREVIOUS_PACKAGE_PATH]` |
-| 4    | Alternatively: Re-run GitHub Actions for previous version                 | Trigger deployment workflow with tag `[PREVIOUS_VERSION_TAG]`                |
-| 5    | Start the Function App (if stopped in step 2)                             | `az functionapp start --name [FUNC_NAME] --resource-group [RG_NAME]`         |
-| 6    | Verify Functions are executing                                            | Check Application Insights > Live Metrics or Invocation logs                 |
-| 7    | Check for message processing (if queue-triggered)                         | Verify Service Bus queue messages are being consumed                         |
-| 8    | Monitor for 15 minutes                                                    | Verify error rates return to baseline                                        |
+| 1    | Identify the commit to revert                                             | `git log --oneline -10`                                                      |
+| 2    | Create a revert commit                                                    | `git revert <COMMIT_SHA>`                                                    |
+| 3    | Push to main (triggers CD pipeline)                                       | `git push origin main`                                                       |
+| 4    | Wait for CD pipeline to deploy                                            | Monitor GitHub Actions                                                       |
+| 5    | Verify deployment                                                         | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
 
-**Estimated Time:** 5-15 minutes
+**Estimated Time:** 10-15 minutes (includes CI/CD pipeline time)
 
 ---
 
-### 4.4 Database Rollback
+### 4.2 Database Rollback (Prisma)
 
-#### Migration Rollback Scripts
+#### Option A: Prisma Migration Rollback (if migration is reversible)
 
 **Prerequisites:**
-- [ ] Down migration scripts exist and have been tested
-- [ ] Database backup taken before the current deployment
-- [ ] DBA or authorized engineer available
+- [ ] Prisma CLI available
+- [ ] Migration down scripts exist (Prisma does not auto-generate down migrations)
+- [ ] Database backup taken before proceeding
 
 **Steps:**
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | **CRITICAL: Take a backup before rolling back**                          | Azure Portal > SQL Database > Export, or `az sql db export`                  |
-| 2    | Identify migrations to reverse                                            | Check migration history: `SELECT * FROM __EFMigrationsHistory ORDER BY MigrationId DESC` (or equivalent) |
-| 3    | Stop application traffic (if data-sensitive rollback)                     | Set App Service / AKS to maintenance mode or scale to 0                      |
-| 4    | Execute down migration scripts                                            | For EF Core: `dotnet ef database update [TARGET_MIGRATION] --project [PROJECT]` |
-| 5    | For manual SQL scripts: Execute in order                                  | Run rollback scripts: `[ROLLBACK_SCRIPT_1.sql]`, `[ROLLBACK_SCRIPT_2.sql]`   |
-| 6    | Verify database schema matches expected state                             | Run schema comparison tool or validate key tables                             |
-| 7    | Verify data integrity                                                     | Run data integrity checks: `[DATA_VALIDATION_QUERY]`                         |
-| 8    | Restore application traffic                                               | Re-enable App Service / AKS                                                  |
-| 9    | Roll back application code (see sections 4.1-4.3)                         | Application must match database schema version                               |
+| 1    | **CRITICAL: Take a backup before rolling back**                          | `az postgres flexible-server restore --resource-group rg-cmmc-assessor-prod --name psql-cmmc-assessor-backup --source-server psql-cmmc-assessor-prod --restore-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"` |
+| 2    | Check current migration status                                           | `npx prisma migrate status`                                                  |
+| 3    | If down migration exists, apply it                                        | Manual SQL execution of the rollback script against psql-cmmc-assessor-prod  |
+| 4    | Verify schema matches expected state                                      | `npx prisma db pull` and compare with previous schema                        |
+| 5    | Roll back application code (see Section 4.1)                              | Application code must match database schema version                          |
 
-**Estimated Time:** 15-60 minutes (depends on migration complexity)
+> **WARNING:** Prisma does not natively generate down migrations. Reversing a migration requires manually writing and executing SQL rollback scripts. If no down migration script exists, use Option B.
 
-#### Point-in-Time Restore (Last Resort)
+#### Option B: Point-in-Time Restore (Last Resort)
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Identify the target restore point (before deployment)                     | Azure Portal > SQL Database > Backups > Point-in-time restore               |
-| 2    | Restore to a new database                                                 | `az sql db restore --dest-name [DB_NAME]-restored --edition [EDITION] --name [DB_NAME] --resource-group [RG_NAME] --server [SERVER_NAME] --time [YYYY-MM-DDTHH:MM:SSZ]` |
-| 3    | Validate restored database                                                | Connect and run validation queries                                           |
-| 4    | Swap connection strings to point to restored database                     | Update Key Vault / App Configuration                                         |
-| 5    | Restart application services                                              | Restart App Service, AKS pods, Functions                                     |
+| 1    | Identify the target restore point (before the deployment)                 | Determine timestamp in UTC (before the problematic migration ran)            |
+| 2    | Restore to a new database server                                          | `az postgres flexible-server restore --resource-group rg-cmmc-assessor-prod --name psql-cmmc-assessor-restored --source-server psql-cmmc-assessor-prod --restore-time "YYYY-MM-DDTHH:MM:SSZ"` |
+| 3    | Validate restored database                                                | Connect via psql and verify data integrity                                   |
+| 4    | Update application connection string in Key Vault                         | `az keyvault secret set --vault-name kv-cmmc-assessor-prod --name DATABASE-URL --value "postgresql://...@psql-cmmc-assessor-restored.postgres.database.azure.com:5432/..."` |
+| 5    | Restart Container Apps to pick up new connection string                    | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --set-env-vars RESTART_TRIGGER=$(date +%s)` |
+| 6    | Verify application connectivity                                           | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
+| 7    | Roll back application code to match restored schema (see Section 4.1)     | Deploy the image version that matches the restored database schema            |
 
-**Estimated Time:** 30-90 minutes
+**Estimated Time:** 30-60 minutes
+
+> **WARNING:** Point-in-time restore will lose any data written after the restore point. This should only be used as a last resort.
 
 ---
 
-### 4.5 Infrastructure Rollback (IaC)
-
-#### Terraform Rollback
+### 4.3 Infrastructure Rollback (Bicep)
 
 **Prerequisites:**
-- [ ] Previous Terraform state is available
-- [ ] Git history for IaC repository accessible
+- [ ] Git history for the IaC files accessible
+- [ ] Azure CLI logged in with sufficient permissions
 
 **Steps:**
 
 | Step | Action                                                                    | Command / Instructions                                                       |
 |------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
 | 1    | Identify the Git commit of the last known good infrastructure state       | `git log --oneline infrastructure/`                                          |
-| 2    | Create a revert commit or check out the previous version                  | `git revert [COMMIT_SHA]` or create a PR reverting the change                |
-| 3    | Run Terraform plan to preview the rollback                                | `terraform plan -out=rollback.tfplan`                                        |
-| 4    | **Review the plan carefully** -- ensure no unintended resource deletions  | Team review of plan output                                                   |
-| 5    | Apply the rollback plan                                                   | `terraform apply rollback.tfplan`                                            |
+| 2    | Create a revert commit                                                    | `git revert <COMMIT_SHA>`                                                    |
+| 3    | Run what-if to preview the rollback                                       | `az deployment group what-if --resource-group rg-cmmc-assessor-prod --template-file infrastructure/main.bicep --parameters infrastructure/parameters.prod.json` |
+| 4    | **Review the what-if output carefully** -- ensure no unintended deletions | Team review of output                                                        |
+| 5    | Deploy the previous version                                               | `az deployment group create --resource-group rg-cmmc-assessor-prod --template-file infrastructure/main.bicep --parameters infrastructure/parameters.prod.json` |
 | 6    | Verify resources are in expected state                                    | Check Azure Portal, run health checks                                        |
-| 7    | Monitor for 30 minutes                                                    | Verify all services are healthy post infrastructure change                   |
+| 7    | Push the revert commit to trigger CD pipeline                              | `git push origin main`                                                       |
 
-**Estimated Time:** 15-60 minutes (depends on resource types)
-
-#### Bicep Rollback
-
-| Step | Action                                                                    | Command / Instructions                                                       |
-|------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| 1    | Identify the previous Bicep template version in Git                       | `git log --oneline infrastructure/`                                          |
-| 2    | Create a revert commit or check out the previous version                  | `git revert [COMMIT_SHA]`                                                    |
-| 3    | Run what-if to preview changes                                            | `az deployment group what-if --resource-group [RG_NAME] --template-file [TEMPLATE] --parameters [PARAMS]` |
-| 4    | Review the what-if output                                                 | Ensure no unintended resource deletions                                      |
-| 5    | Deploy the previous version                                               | `az deployment group create --resource-group [RG_NAME] --template-file [TEMPLATE] --parameters [PARAMS]` |
-| 6    | Verify resources and monitor                                              | Check Azure Portal and health checks                                         |
-
-**Estimated Time:** 15-60 minutes
+**Estimated Time:** 15-30 minutes
 
 ---
 
@@ -263,19 +203,14 @@ After completing any rollback, verify the following:
 
 ### 5.1 Universal Verification Checklist
 
-- [ ] Application health check endpoints returning 200 OK
-- [ ] Application version matches the expected rolled-back version
-- [ ] Error rates in Application Insights returning to pre-deployment baseline
-- [ ] Response latency (P95) within acceptable thresholds
-- [ ] No new exceptions or error patterns in logs
-- [ ] Database connectivity confirmed
-- [ ] Cache connectivity confirmed
-- [ ] Queue / message processing resumed (if applicable)
-- [ ] Background jobs executing (if applicable)
-- [ ] SSL/TLS certificates valid
-- [ ] All external integrations responding correctly
-- [ ] Monitoring dashboards showing healthy state
-- [ ] Smoke tests passing (run automated suite if available)
+- [ ] API health check returns 200 OK: `curl -s https://api.cmmc.intellisecops.com/api/health`
+- [ ] Frontend loads successfully: `curl -s -o /dev/null -w "%{http_code}" https://cmmc.intellisecops.com`
+- [ ] Container App revision is active: `az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod -o table`
+- [ ] No new errors in Log Analytics (check last 15 minutes)
+- [ ] Database connectivity confirmed (health endpoint returns successfully)
+- [ ] User login works (manual test)
+- [ ] Core assessment workflow functional (manual test)
+- [ ] No new crash loops in Container App system logs
 
 ### 5.2 Verification Sign-Off
 
@@ -283,10 +218,8 @@ After completing any rollback, verify the following:
 |-------------------|---------------|--------------|-----------------|----------------------|
 | Health Checks     | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
 | Error Rates       | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
-| Performance       | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
 | Data Integrity    | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
-| Integrations      | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
-| Monitoring        | [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
+| User Functionality| [NAME]        | [Pass/Fail]  | [HH:MM UTC]     |                      |
 
 ---
 
@@ -295,22 +228,25 @@ After completing any rollback, verify the following:
 ### 6.1 Internal Communication
 
 ```
-ROLLBACK COMPLETED -- [VERSION] -> [PREVIOUS VERSION]
+ROLLBACK COMPLETED -- [NEW_IMAGE_TAG] -> [PREVIOUS_IMAGE_TAG]
 
 Time: [HH:MM UTC]
 Reason: [BRIEF REASON FOR ROLLBACK]
 Impact: [DESCRIPTION OF IMPACT DURING INCIDENT]
 Duration of Impact: [XX minutes]
-Current Status: Service restored, running [PREVIOUS VERSION]
+Current Status: Service restored, running [PREVIOUS_IMAGE_TAG]
 Next Steps: [Root cause investigation, hotfix timeline]
 
-Incident ticket: [INC-XXXX]
+Affected services:
+- cmmc-api: rolled back to image tag [TAG]
+- cmmc-web: rolled back to image tag [TAG]
+- Database: [unchanged / restored to point-in-time YYYY-MM-DDTHH:MM]
 ```
 
 ### 6.2 External Communication (if applicable)
 
 ```
-[RESOLVED] -- [SERVICE NAME] Service Disruption
+Subject: RESOLVED -- CMMC Assessor Platform Service Disruption
 
 The issue affecting [DESCRIPTION] has been resolved as of [TIME UTC].
 We have reverted to the previous stable version while we investigate.
@@ -318,8 +254,7 @@ We have reverted to the previous stable version while we investigate.
 Impact Duration: [XX minutes]
 Data Loss: [None / DESCRIPTION]
 
-We apologize for the inconvenience and will share a post-mortem
-within 48 hours.
+We apologize for the inconvenience. For questions, contact support@intellisecsolutions.com.
 ```
 
 ---
@@ -328,42 +263,38 @@ within 48 hours.
 
 | Step | Action                                             | Responsible     | Timeline            |
 |------|----------------------------------------------------|-----------------|---------------------|
-| 1    | Create investigation ticket                         | [On-Call]       | [Immediately]       |
-| 2    | Preserve logs and telemetry from failed deployment  | [SRE]           | [Within 1 hour]     |
-| 3    | Conduct root cause analysis                         | [Engineering]   | [Within 24 hours]   |
-| 4    | Reproduce issue in non-production environment       | [Engineering]   | [Within 48 hours]   |
-| 5    | Develop fix with additional test coverage           | [Engineering]   | [TBD based on RCA]  |
-| 6    | Test fix in Dev and Staging environments            | [QA]            | [Before re-release] |
-| 7    | Schedule re-release with additional monitoring      | [Release Manager]| [TBD]              |
-| 8    | Conduct post-mortem (if SEV 1/2)                    | [IC]            | [Within 48 hours]   |
+| 1    | Document the rollback in the project issue tracker  | Engineer        | Immediately         |
+| 2    | Preserve logs from the failed deployment             | Engineer        | Within 1 hour       |
+| 3    | Conduct root cause analysis                          | Engineer        | Within 24 hours     |
+| 4    | Reproduce issue locally                              | Engineer        | Within 48 hours     |
+| 5    | Develop fix with additional test coverage            | Engineer        | TBD based on RCA    |
+| 6    | Test fix locally before re-deploying                 | Engineer        | Before re-release   |
+| 7    | Re-deploy with monitoring                            | Engineer        | TBD                 |
 
 ---
 
 ## 8. Rollback Testing Schedule
 
+**Status: NOT IMPLEMENTED** -- No regular rollback testing is conducted.
+
 | Test Type                              | Frequency        | Scope                                       | Last Tested      | Next Scheduled   |
 |----------------------------------------|------------------|---------------------------------------------|------------------|------------------|
-| App Service slot swap rollback         | [Quarterly]      | [Swap staging to production and verify]     | [YYYY-MM-DD]     | [YYYY-MM-DD]     |
-| AKS Helm rollback                      | [Quarterly]      | [Roll back one revision and verify]         | [YYYY-MM-DD]     | [YYYY-MM-DD]     |
-| Functions redeploy previous version    | [Quarterly]      | [Deploy previous package and verify]        | [YYYY-MM-DD]     | [YYYY-MM-DD]     |
-| Database migration rollback            | [Monthly]        | [Run down migration in staging]             | [YYYY-MM-DD]     | [YYYY-MM-DD]     |
-| Infrastructure IaC rollback            | [Semi-annually]  | [Revert IaC commit, apply in staging]       | [YYYY-MM-DD]     | [YYYY-MM-DD]     |
-| Full end-to-end rollback drill         | [Semi-annually]  | [Simulate bad deployment, execute full rollback] | [YYYY-MM-DD] | [YYYY-MM-DD]     |
+| Container App image rollback           | NOT SCHEDULED    | Redeploy previous image, verify             | Never            | TBD              |
+| Database point-in-time restore         | NOT SCHEDULED    | Restore to new server, verify data          | Never            | TBD              |
+| Bicep infrastructure rollback          | NOT SCHEDULED    | Revert Bicep commit, what-if, apply         | Never            | TBD              |
+| Full end-to-end rollback drill         | NOT SCHEDULED    | Simulate bad deployment, execute rollback    | Never            | TBD              |
 
-### Rollback Test Results
+### Planned Improvements
 
-| Test Date      | Test Type                    | Environment | Result      | Duration   | Issues Found             | Action Items               |
-|----------------|------------------------------|-------------|-------------|------------|--------------------------|----------------------------|
-| [YYYY-MM-DD]   | [App Service slot swap]      | [Staging]   | [Pass/Fail] | [X min]    | [ISSUES OR "None"]       | [ACTIONS OR "None"]        |
-| [YYYY-MM-DD]   | [AKS Helm rollback]          | [Staging]   | [Pass/Fail] | [X min]    | [ISSUES OR "None"]       | [ACTIONS OR "None"]        |
-| [YYYY-MM-DD]   | [Database migration rollback]| [Staging]   | [Pass/Fail] | [X min]    | [ISSUES OR "None"]       | [ACTIONS OR "None"]        |
-| [DATE]         | [TYPE]                       | [ENV]       | [RESULT]    | [DURATION] | [ISSUES]                 | [ACTIONS]                  |
+- Schedule quarterly rollback drills
+- Test Container App image rollback procedure in production
+- Test PostgreSQL point-in-time restore at least once
+- Document results and improve procedures based on findings
 
 ---
 
 ## 9. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |

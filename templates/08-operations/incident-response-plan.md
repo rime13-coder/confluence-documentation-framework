@@ -3,26 +3,28 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Incident Response Plan             |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Approved]     |
-| Owner            | [TEAM OR INDIVIDUAL NAME]          |
+| Last Updated     | 2026-02-14                         |
+| Status           | Draft                              |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the incident response process for the [PROJECT NAME] platform. It establishes severity definitions, roles, communication procedures, escalation paths, and post-mortem practices to ensure incidents are detected, triaged, resolved, and learned from in a structured and consistent manner.
+This document defines the incident response process for the CMMC Assessor Platform. It establishes severity definitions, roles, communication procedures, escalation paths, and post-mortem practices. The current incident response capabilities are minimal and this document serves as both a record of current state and a target for improvement.
+
+**Current State: Formal incident response processes are NOT IMPLEMENTED.** There is no on-call rotation, no automated alerting, no status page, and no documented escalation path. This document defines the target process that should be adopted.
 
 ---
 
 ## 2. Incident Severity Definitions
 
-| Severity | Name       | Definition                                                        | Examples                                                                  | Response Time  | Update Frequency   | Bridge Call Required |
-|----------|------------|-------------------------------------------------------------------|---------------------------------------------------------------------------|----------------|--------------------|----------------------|
-| SEV 1    | Critical   | Complete service outage or data loss affecting all users          | - Production is completely down<br>- Data breach confirmed<br>- Database corruption affecting all users | 15 minutes     | Every 30 minutes   | Yes                  |
-| SEV 2    | Major      | Major feature unavailable or significant performance degradation  | - Payment processing down<br>- API error rate >10%<br>- Response times >10x normal | 30 minutes     | Every 60 minutes   | Yes (optional)       |
-| SEV 3    | Minor      | Minor feature issue or moderate performance degradation           | - Non-critical feature broken<br>- Response times 2-3x normal<br>- Single background job failing | 2 hours        | Every 4 hours      | No                   |
-| SEV 4    | Low        | Cosmetic or informational issue with no user impact               | - Minor UI glitch<br>- Log noise increase<br>- Non-critical alert firing | Next business day | Daily             | No                   |
+| Severity | Name       | Definition                                                        | Examples                                                                  | Response Time  | Update Frequency   |
+|----------|------------|-------------------------------------------------------------------|---------------------------------------------------------------------------|----------------|--------------------|
+| SEV 1    | Critical   | Complete service outage or data loss affecting all users          | - Platform completely inaccessible<br>- Data breach confirmed<br>- Database corruption | Best effort (no SLA) | As needed    |
+| SEV 2    | Major      | Major feature unavailable or significant performance degradation  | - Assessment workflow broken<br>- API error rate >10%<br>- Login failures for all users | Best effort | As needed    |
+| SEV 3    | Minor      | Minor feature issue or moderate performance degradation           | - Non-critical feature broken<br>- Slow response times<br>- Single report type failing | Next business day | Daily       |
+| SEV 4    | Low        | Cosmetic or informational issue with no user impact               | - Minor UI glitch<br>- Log noise increase<br>- Non-critical console warning | Backlog       | N/A                |
 
 ### Severity Determination Flowchart
 
@@ -31,11 +33,11 @@ Is there a security breach or data loss?
   YES -> SEV 1
   NO  -> Continue
 
-Are all/most users unable to use the system?
+Are all/most users unable to use the platform?
   YES -> SEV 1
   NO  -> Continue
 
-Is a major feature (revenue-impacting) unavailable?
+Is a major feature (assessments, reports) unavailable?
   YES -> SEV 2
   NO  -> Continue
 
@@ -54,90 +56,79 @@ Is there measurable performance degradation or a minor feature outage?
 DETECT          TRIAGE          CONTAIN         RESOLVE         POST-MORTEM
   |                |                |               |                |
   v                v                v               v                v
-Alert fires    Assess severity   Stop bleeding   Fix root cause   Blameless
-or report      Assign roles      Limit blast     Deploy fix       retrospective
-received       Open bridge       radius          Verify fix       Action items
-               Communicate       Mitigate        Communicate      Improve process
-                                                 resolution
+Issue reported  Assess severity   Investigate     Fix root cause   Document
+manually or     Communicate to    Mitigate if     Deploy fix       lessons
+user complaint  team              possible        Verify fix       learned
 ```
+
+> **Note:** Detection is currently manual. There are no automated alerts or monitoring that would detect issues proactively. Issues are typically discovered through user reports or manual checks.
 
 ### 3.2 Detailed Process Steps
 
-#### Phase 1: Detect (Target: <5 minutes)
+#### Phase 1: Detect
 
 | Step | Action                                                    | Responsible        |
 |------|-----------------------------------------------------------|--------------------|
-| 1.1  | Alert fires from monitoring or user reports issue         | Automated / Anyone |
-| 1.2  | On-call engineer acknowledges the alert                   | On-Call Engineer   |
-| 1.3  | On-call engineer performs initial assessment               | On-Call Engineer   |
+| 1.1  | Issue reported by user or discovered manually             | Anyone             |
+| 1.2  | Check application health: `curl https://api.cmmc.intellisecops.com/api/health` | Engineer |
+| 1.3  | Check Container App status in Azure Portal                | Engineer           |
+| 1.4  | Review Log Analytics for errors                           | Engineer           |
 
-#### Phase 2: Triage (Target: <15 minutes for SEV 1/2)
+#### Phase 2: Triage
 
 | Step | Action                                                    | Responsible          |
 |------|-----------------------------------------------------------|----------------------|
-| 2.1  | Determine severity level using definitions above          | On-Call Engineer     |
-| 2.2  | Create incident ticket in [TICKETING SYSTEM]              | On-Call Engineer     |
-| 2.3  | Post in [#incident-channel] with initial details          | On-Call Engineer     |
-| 2.4  | For SEV 1/2: Page Incident Commander                      | On-Call Engineer     |
-| 2.5  | For SEV 1/2: Open bridge call / war room                  | Incident Commander   |
-| 2.6  | Assign incident roles (see Section 4)                     | Incident Commander   |
-| 2.7  | Send initial notification to stakeholders                  | Communications Lead  |
+| 2.1  | Determine severity level using definitions above          | Engineer             |
+| 2.2  | Notify team lead via email or direct message              | Engineer             |
+| 2.3  | For SEV 1/2: Communicate to full team                     | Team lead            |
 
-#### Phase 3: Contain (Target: <30 minutes for SEV 1)
+#### Phase 3: Contain
 
 | Step | Action                                                    | Responsible        |
 |------|-----------------------------------------------------------|--------------------|
-| 3.1  | Identify blast radius (what is affected and what is not)  | Technical Lead     |
-| 3.2  | Implement immediate mitigation (scale, restart, rollback) | Technical Lead     |
-| 3.3  | Verify containment is effective                           | Technical Lead     |
-| 3.4  | Update stakeholders on containment status                 | Communications Lead|
+| 3.1  | Identify what is affected and what is working             | Engineer           |
+| 3.2  | Implement immediate mitigation (restart, rollback, scale) | Engineer           |
+| 3.3  | Refer to Runbook for common procedures                    | Engineer           |
 
-#### Phase 4: Resolve (Target: within RTO)
+#### Phase 4: Resolve
 
 | Step | Action                                                    | Responsible        |
 |------|-----------------------------------------------------------|--------------------|
-| 4.1  | Identify root cause (or sufficient cause for resolution)  | Technical Lead     |
-| 4.2  | Develop and test fix                                       | Engineering Team   |
-| 4.3  | Deploy fix to production                                   | Engineering Team   |
-| 4.4  | Verify fix resolves the issue                              | QA / SRE           |
-| 4.5  | Monitor for recurrence (minimum 30 minutes)                | On-Call Engineer   |
-| 4.6  | Declare incident resolved                                  | Incident Commander |
-| 4.7  | Send resolution notification to stakeholders               | Communications Lead|
-| 4.8  | Close incident ticket                                      | Incident Commander |
+| 4.1  | Identify root cause                                       | Engineer           |
+| 4.2  | Develop and test fix locally                              | Engineer           |
+| 4.3  | Deploy fix (push to main triggers CD pipeline)            | Engineer           |
+| 4.4  | Verify fix resolves the issue                             | Engineer           |
+| 4.5  | Monitor for recurrence                                    | Engineer           |
 
-#### Phase 5: Post-Mortem (Target: within 48 hours)
+#### Phase 5: Post-Mortem
 
 | Step | Action                                                    | Responsible          |
 |------|-----------------------------------------------------------|----------------------|
-| 5.1  | Schedule blameless post-mortem within 48 hours            | Incident Commander   |
-| 5.2  | Prepare incident timeline                                  | Technical Lead       |
-| 5.3  | Conduct post-mortem meeting                                | Incident Commander   |
-| 5.4  | Document findings and action items                         | All participants     |
-| 5.5  | Publish post-mortem document                               | Incident Commander   |
-| 5.6  | Track action items to completion                           | Team leads           |
+| 5.1  | Document what happened and root cause                     | Engineer             |
+| 5.2  | Identify action items to prevent recurrence               | Team                 |
+| 5.3  | Track action items to completion                          | Team lead            |
 
 ---
 
 ## 4. Roles During Incidents
 
-### 4.1 Role Definitions
+### 4.1 Role Definitions (Target State)
 
-| Role                  | Responsibilities                                                                      | Assigned To                     |
-|-----------------------|---------------------------------------------------------------------------------------|---------------------------------|
-| **Incident Commander (IC)** | Owns the incident end-to-end. Makes decisions on severity, escalation, and resolution strategy. Keeps the process moving. Does NOT debug. | [SRE Lead / Engineering Manager rotation] |
-| **Technical Lead**    | Leads the technical investigation and resolution. Coordinates the engineering response. Communicates technical details to the IC. | [Senior engineer most familiar with affected system] |
-| **Communications Lead** | Manages all internal and external communications. Posts updates on schedule. Updates status page. | [Product Manager / Designated rotation] |
-| **Scribe**            | Documents the incident timeline in real-time. Records decisions, actions, and findings. | [Any available team member]     |
-| **Subject Matter Expert (SME)** | Provides specialized knowledge (DBA, networking, security, specific service owner). Assists the Technical Lead. | [As needed -- paged by IC]     |
+| Role                  | Responsibilities                                                                      | Current State                         |
+|-----------------------|---------------------------------------------------------------------------------------|---------------------------------------|
+| Incident Commander    | Owns the incident, makes decisions, coordinates response                              | NOT ASSIGNED -- no rotation defined   |
+| Technical Lead        | Leads investigation and resolution                                                     | Ad-hoc (whoever is available)         |
+| Communications Lead   | Manages stakeholder communication                                                      | NOT ASSIGNED                          |
 
 ### 4.2 Incident Commander Rotation
 
-| Week Of          | Primary IC             | Backup IC              |
-|------------------|------------------------|------------------------|
-| [YYYY-MM-DD]     | [NAME]                 | [NAME]                 |
-| [YYYY-MM-DD]     | [NAME]                 | [NAME]                 |
-| [YYYY-MM-DD]     | [NAME]                 | [NAME]                 |
-| [YYYY-MM-DD]     | [NAME]                 | [NAME]                 |
+**Status: NOT IMPLEMENTED** -- No on-call or incident commander rotation exists.
+
+### Planned Improvements
+
+- Define incident commander rotation schedule
+- Establish on-call rotation with defined response time expectations
+- Integrate with an on-call management tool (PagerDuty, OpsGenie, or similar)
 
 ---
 
@@ -145,112 +136,66 @@ received       Open bridge       radius          Verify fix       Action items
 
 ### 5.1 Communication Channels
 
-| Channel                    | Purpose                                          | Audience                  |
-|----------------------------|--------------------------------------------------|---------------------------|
-| [Slack #incident-active]   | Real-time incident coordination                  | Incident team             |
-| [Bridge call / Teams meeting] | Voice coordination for SEV 1/2                | Incident team             |
-| [Slack #incidents-announce] | Broadcast updates to wider engineering team      | All engineering           |
-| [Status page]              | External customer-facing updates                 | Customers                 |
-| [Email DL: incident-updates@company.com] | Formal updates to stakeholders      | Executives, support       |
+| Channel                    | Purpose                                          | Audience                  | Status           |
+|----------------------------|--------------------------------------------------|---------------------------|------------------|
+| Email                      | Incident notifications                           | Team                      | Active           |
+| support@intellisecsolutions.com | Customer-facing support contact             | Customers                 | Active           |
+| Status page                | External customer-facing updates                 | Customers                 | NOT IMPLEMENTED  |
 
 ### 5.2 Communication Templates
 
-#### SEV 1 -- Initial Notification (Internal)
+#### SEV 1 -- Internal Notification
 
 ```
-INCIDENT DECLARED: SEV 1 -- [BRIEF DESCRIPTION]
+INCIDENT: SEV 1 -- [BRIEF DESCRIPTION]
 
 Detected: [TIME UTC]
 Impact: [WHAT IS BROKEN AND WHO IS AFFECTED]
 Current Status: Investigating
-Incident Commander: [NAME]
-Technical Lead: [NAME]
-Bridge: [MEETING LINK / PHONE NUMBER]
+Lead: [NAME]
+Platform: CMMC Assessor Platform
+URLs affected: cmmc.intellisecops.com, api.cmmc.intellisecops.com
 
-Next update in 30 minutes.
+Next update: [TIME]
 ```
 
-#### SEV 1 -- Initial Notification (External / Status Page)
+#### SEV 1 -- Customer Notification (via support email)
 
 ```
-[SERVICE NAME] -- Investigating Service Disruption
+Subject: CMMC Assessor Platform -- Service Disruption
 
-We are currently investigating reports of [BRIEF DESCRIPTION OF IMPACT].
-Our team has been mobilized and is actively working on resolution.
+Dear users,
+
+We are currently experiencing a service disruption affecting the CMMC Assessor Platform.
+Our team has been activated and is working to restore services.
 
 Impact: [CUSTOMER-FACING IMPACT DESCRIPTION]
 Status: Investigating
-Started: [TIME UTC]
+Started: [TIME]
 
-Next update: [TIME UTC]
+We will provide updates as the situation progresses.
+For urgent matters, please contact support@intellisecsolutions.com.
 ```
 
-#### SEV 2 -- Initial Notification (Internal)
+#### Resolution Notification
 
 ```
-INCIDENT: SEV 2 -- [BRIEF DESCRIPTION]
+Subject: RESOLVED -- CMMC Assessor Platform Service Disruption
 
-Detected: [TIME UTC]
-Impact: [WHAT IS DEGRADED AND WHO IS AFFECTED]
-Current Status: Investigating
-Lead: [NAME]
-Channel: #incident-active
+The service disruption affecting [DESCRIPTION] has been resolved as of [TIME].
 
-Next update in 60 minutes.
-```
-
-#### Update Template (All Severities)
-
-```
-INCIDENT UPDATE #[N] -- SEV [X] -- [BRIEF DESCRIPTION]
-
-Time: [TIME UTC]
-Status: [Investigating / Identified / Mitigating / Resolved]
-Actions Taken: [WHAT HAS BEEN DONE SINCE LAST UPDATE]
-Current Impact: [REMAINING IMPACT]
-Next Steps: [WHAT THE TEAM IS DOING NEXT]
-ETA: [ESTIMATED TIME TO RESOLUTION, or "Unknown"]
-
-Next update at [TIME UTC].
-```
-
-#### Resolution Template
-
-```
-INCIDENT RESOLVED -- SEV [X] -- [BRIEF DESCRIPTION]
-
-Resolved: [TIME UTC]
 Duration: [TOTAL DURATION]
-Impact Summary: [WHAT WAS IMPACTED]
-Resolution: [WHAT FIXED THE ISSUE]
+Root Cause: [BRIEF ROOT CAUSE]
 Data Loss: [None / DESCRIPTION]
 
-A post-mortem will be conducted within 48 hours.
-Post-mortem document: [LINK]
+We apologize for the inconvenience.
 ```
 
 ---
 
 ## 6. War Room / Bridge Call Procedures
 
-### 6.1 Bridge Call Setup
-
-| Attribute                 | Value                                                 |
-|---------------------------|-------------------------------------------------------|
-| Bridge Call Tool          | [Microsoft Teams / Zoom / Google Meet]                |
-| Standing Bridge Link      | [PERMANENT MEETING LINK FOR INCIDENTS]                |
-| Dial-in Number            | [+1-XXX-XXX-XXXX, PIN: XXXXXX]                       |
-| Recording                 | [Enabled by default for SEV 1]                        |
-
-### 6.2 Bridge Call Etiquette
-
-- Incident Commander opens and runs the bridge
-- Mute when not speaking
-- Identify yourself before speaking
-- Keep discussion focused on resolution, not blame
-- All decisions are made by the Incident Commander
-- If you are not actively contributing, leave the bridge and follow updates in Slack
-- The IC may ask people to leave if the bridge becomes too crowded
+**Status: NOT IMPLEMENTED** -- No standing bridge call or war room process is defined. For SEV 1 incidents, team members should communicate directly via available channels (email, chat, phone).
 
 ---
 
@@ -258,12 +203,10 @@ Post-mortem document: [LINK]
 
 | Attribute                    | Value                                               |
 |------------------------------|-----------------------------------------------------|
-| Incident Tracking Tool       | [Azure DevOps / PagerDuty / ServiceNow / Jira]      |
-| Incident Ticket Prefix       | [INC-]                                              |
-| Ticket Required For          | [All SEV 1, SEV 2, and SEV 3 incidents]             |
-| Fields Required              | [Severity, Timeline, Root Cause, Resolution, Action Items] |
-| Ticket Lifecycle             | [Open -> Investigating -> Mitigating -> Resolved -> Post-Mortem Complete -> Closed] |
-| Archive Location             | [Confluence space / Wiki page for all post-mortems]  |
+| Incident Tracking Tool       | GitHub Issues (or equivalent project tracker)       |
+| Incident Ticket Prefix       | Not standardized                                    |
+| Ticket Required For          | Recommended for SEV 1 and SEV 2 incidents           |
+| Fields Required              | Severity, Timeline, Root Cause, Resolution          |
 
 ---
 
@@ -277,74 +220,38 @@ Post-mortem document: [LINK]
 | Severity           | [SEV X]                                   |
 | Date               | [YYYY-MM-DD]                              |
 | Duration           | [X hours Y minutes]                       |
-| Incident Commander | [NAME]                                    |
-| Technical Lead     | [NAME]                                    |
+| Lead               | [NAME]                                    |
 | Post-Mortem Author | [NAME]                                    |
-| Post-Mortem Date   | [YYYY-MM-DD]                              |
-| Status             | [Draft / Reviewed / Final]                |
-
-#### Impact Summary
-
-| Impact Area                | Details                                    |
-|----------------------------|--------------------------------------------|
-| Users affected             | [NUMBER or percentage]                     |
-| Revenue impact             | [Estimated $X,XXX or N/A]                 |
-| Data loss                  | [None / DESCRIPTION]                       |
-| SLA impact                 | [SLA breached: Yes/No, error budget consumed: X%] |
-| Customer tickets generated | [NUMBER]                                   |
 
 #### Timeline
 
-| Time (UTC)    | Event                                                         | Actor              |
-|---------------|---------------------------------------------------------------|-------------------|
-| [HH:MM]       | [First sign of issue in monitoring]                           | [Automated]       |
-| [HH:MM]       | [Alert fired]                                                 | [Azure Monitor]   |
-| [HH:MM]       | [On-call acknowledged alert]                                  | [NAME]            |
-| [HH:MM]       | [Incident declared as SEV X]                                  | [NAME]            |
-| [HH:MM]       | [Bridge call opened]                                          | [NAME]            |
-| [HH:MM]       | [Root cause identified: DESCRIPTION]                          | [NAME]            |
-| [HH:MM]       | [Mitigation applied: DESCRIPTION]                             | [NAME]            |
-| [HH:MM]       | [Fix deployed to production]                                  | [NAME]            |
-| [HH:MM]       | [Incident resolved, services restored]                        | [NAME]            |
+| Time (UTC)    | Event                                                         |
+|---------------|---------------------------------------------------------------|
+| [HH:MM]       | [Issue first observed / reported]                             |
+| [HH:MM]       | [Investigation started]                                       |
+| [HH:MM]       | [Root cause identified]                                       |
+| [HH:MM]       | [Fix deployed]                                                |
+| [HH:MM]       | [Issue resolved, service restored]                            |
 
 #### Root Cause
 
-[DETAILED TECHNICAL EXPLANATION of what caused the incident. Be specific -- code changes, configuration errors, infrastructure failures, capacity issues, etc.]
-
-#### Contributing Factors
-
-- [FACTOR 1: e.g., Missing alert for the specific failure mode]
-- [FACTOR 2: e.g., Test coverage did not cover this edge case]
-- [FACTOR 3: e.g., Runbook was outdated for this scenario]
-- [FACTOR 4: e.g., No circuit breaker on the failing dependency]
+[DETAILED TECHNICAL EXPLANATION of what caused the incident.]
 
 #### What Went Well
 
-- [POSITIVE 1: e.g., Alert fired within 2 minutes of the issue starting]
-- [POSITIVE 2: e.g., Team assembled quickly and communicated well]
-- [POSITIVE 3: e.g., Rollback procedure worked as documented]
+- [POSITIVE 1]
+- [POSITIVE 2]
 
 #### What Could Be Improved
 
-- [IMPROVEMENT 1: e.g., Detection time could be faster with additional metrics]
-- [IMPROVEMENT 2: e.g., Communication to customers was delayed]
-- [IMPROVEMENT 3: e.g., Runbook did not cover this specific scenario]
+- [IMPROVEMENT 1]
+- [IMPROVEMENT 2]
 
 #### Action Items
 
-| # | Action Item                                    | Owner            | Priority   | Due Date       | Status          | Ticket Link     |
-|---|------------------------------------------------|------------------|------------|----------------|-----------------|-----------------|
-| 1 | [Add monitoring for SPECIFIC_CONDITION]        | [NAME]           | [P1]       | [YYYY-MM-DD]   | [Open]          | [JIRA-XXX]      |
-| 2 | [Add circuit breaker to DEPENDENCY]            | [NAME]           | [P1]       | [YYYY-MM-DD]   | [Open]          | [JIRA-XXX]      |
-| 3 | [Update runbook with new procedure]            | [NAME]           | [P2]       | [YYYY-MM-DD]   | [Open]          | [JIRA-XXX]      |
-| 4 | [Add integration test for edge case]           | [NAME]           | [P2]       | [YYYY-MM-DD]   | [Open]          | [JIRA-XXX]      |
-| 5 | [ACTION]                                       | [NAME]           | [PRIORITY] | [DATE]         | [STATUS]        | [LINK]          |
-
-#### Lessons Learned
-
-- [LESSON 1: Key takeaway that should be shared broadly]
-- [LESSON 2: Process improvement identified]
-- [LESSON 3: Technical lesson applicable to other services]
+| # | Action Item                                    | Owner            | Priority   | Due Date       | Status          |
+|---|------------------------------------------------|------------------|------------|----------------|-----------------|
+| 1 | [ACTION]                                       | [NAME]           | [P1/P2/P3] | [YYYY-MM-DD]  | [Open]          |
 
 ---
 
@@ -352,29 +259,29 @@ Post-mortem document: [LINK]
 
 ### 9.1 Metrics Tracked
 
-| Metric                                  | Definition                                                  | Target                | Current        |
-|-----------------------------------------|-------------------------------------------------------------|-----------------------|----------------|
-| MTTD (Mean Time to Detect)              | Time from incident start to first alert                     | [<5 minutes]          | [XX minutes]   |
-| MTTA (Mean Time to Acknowledge)         | Time from alert to human acknowledgment                     | [<5 minutes (SEV1)]   | [XX minutes]   |
-| MTTR (Mean Time to Resolve)             | Time from incident start to resolution                      | [<1 hour (SEV1)]      | [XX minutes]   |
-| MTBF (Mean Time Between Failures)       | Average time between SEV 1/2 incidents                      | [>30 days]            | [XX days]      |
-| Incidents per month (by severity)       | Count of incidents in each severity category                | [SEV1: 0, SEV2: <2]   | [X, Y]        |
-| Post-mortem completion rate             | Percentage of SEV 1/2 incidents with completed post-mortems | [100%]                | [XX%]          |
-| Action item completion rate             | Percentage of post-mortem action items completed on time    | [>90%]                | [XX%]          |
+**Status: NOT IMPLEMENTED** -- No incident metrics are tracked. The following metrics should be tracked once the incident response process is formalized:
+
+| Metric                                  | Definition                                                  | Target                |
+|-----------------------------------------|-------------------------------------------------------------|-----------------------|
+| MTTD (Mean Time to Detect)              | Time from incident start to discovery                       | TBD                   |
+| MTTR (Mean Time to Resolve)             | Time from incident start to resolution                      | TBD                   |
+| Incidents per month (by severity)       | Count of incidents in each severity category                | TBD                   |
+| Post-mortem completion rate             | Percentage of SEV 1/2 incidents with completed post-mortems | 100% (target)         |
 
 ### 9.2 Incident Reporting
 
-| Report                    | Frequency  | Audience                     | Owner              |
-|---------------------------|------------|------------------------------|--------------------|
-| Weekly Incident Summary   | Weekly     | Engineering team              | SRE Lead           |
-| Monthly Incident Report   | Monthly    | Engineering + Product         | SRE Lead           |
-| Quarterly Incident Review | Quarterly  | Engineering + Executives      | VP Engineering     |
+**Status: NOT IMPLEMENTED** -- No regular incident reporting cadence is established.
+
+### Planned Improvements
+
+- Track all SEV 1/2 incidents with formal post-mortems
+- Establish monthly incident review cadence
+- Report incident trends quarterly to stakeholders
 
 ---
 
 ## 10. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |

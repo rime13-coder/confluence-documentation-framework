@@ -2,9 +2,9 @@
 
 | **Page Title**   | GitHub Actions CI/CD Overview              |
 |------------------|--------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                               |
-| **Status**       | [Draft / In Review / Approved / Deprecated] |
-| **Owner**        | [TEAM OR INDIVIDUAL NAME]                  |
+| **Last Updated** | 2026-02-14                                 |
+| **Status**       | In Review                                  |
+| **Owner**        | IntelliSecOps DevOps Team                  |
 
 ---
 
@@ -13,38 +13,29 @@
 Our CI/CD philosophy is built on the following principles:
 
 - **Automate everything** — every build, test, and deployment is triggered and executed through GitHub Actions with zero manual steps in the critical path.
-- **Shift left** — catch defects as early as possible through linting, static analysis, and unit tests that run on every push.
-- **Immutable artifacts** — build once, deploy the same artifact through every environment.
-- **Environment parity** — keep non-production environments as close to production as feasible to reduce deployment surprises.
-- **Fast feedback** — optimize pipeline duration so developers receive results within minutes, not hours.
-- **Auditability** — every deployment is traceable to a commit, a pull request, an approver, and a workflow run.
+- **Shift left** — catch defects as early as possible through linting, static analysis, type checking, and security scans that run on every PR.
+- **Immutable artifacts** — Docker images are built once, tagged with the Git SHA, and promoted through environments without rebuilding.
+- **Environment parity** — local Docker Compose mirrors the production Container Apps topology (backend API, frontend SPA, PostgreSQL) to reduce deployment surprises.
+- **Fast feedback** — CI runs four parallel jobs (backend-ci, frontend-ci, security-scan, dependency-audit) so developers receive results quickly.
+- **Auditability** — every production deployment is traceable to a commit, a pull request, and a workflow run via OIDC-authenticated Azure deployments.
 
 ---
 
 ## 2. Branching Strategy
 
-Choose **one** of the following strategies and delete the other.
-
-### Option A — GitFlow
+### GitFlow (Simplified)
 
 | Branch            | Purpose                                  | Lifetime     | Deploys To       |
 |-------------------|------------------------------------------|--------------|------------------|
-| `main`            | Production-ready code                    | Permanent    | Production       |
-| `develop`         | Integration branch for next release      | Permanent    | Dev / QA         |
-| `feature/*`       | New feature development                  | Short-lived  | Ephemeral / Dev  |
-| `release/*`       | Release stabilization                    | Short-lived  | Staging          |
-| `hotfix/*`        | Emergency production fixes               | Short-lived  | Staging -> Prod  |
+| `main`            | Production-ready code                    | Permanent    | Production (Azure Container Apps) |
+| `develop`         | Integration branch for next release      | Permanent    | Local dev (Docker Compose) |
+| `feature/*`       | New feature development                  | Short-lived  | Local dev         |
 
-**When to use:** Large teams with scheduled release cadences, multiple parallel releases, or regulatory environments that require formal release branches.
-
-### Option B — Trunk-Based Development
-
-| Branch            | Purpose                                  | Lifetime     | Deploys To       |
-|-------------------|------------------------------------------|--------------|------------------|
-| `main`            | Single source of truth; always deployable | Permanent    | All environments |
-| `feature/*`       | Short-lived feature branches (< 2 days)  | Short-lived  | Ephemeral / Dev  |
-
-**When to use:** Teams practicing continuous delivery, small-to-medium team sizes, and projects where feature flags control rollout.
+**Branch flow:**
+- Developers create `feature/*` branches from `develop` and open PRs to `develop`.
+- PRs to `main` or `develop` trigger the CI workflow.
+- Pushing to `develop` also triggers CI.
+- Pushing to `main` triggers the CD workflow for production deployment.
 
 ---
 
@@ -53,51 +44,46 @@ Choose **one** of the following strategies and delete the other.
 | Approach    | Description                                                                 | Pros                                      | Cons                                          |
 |-------------|-----------------------------------------------------------------------------|-------------------------------------------|-----------------------------------------------|
 | **Mono-repo** | All services, libraries, and IaC live in a single repository.             | Atomic cross-service changes; shared workflows | Larger clone size; path-filter complexity     |
-| **Multi-repo** | Each service or bounded context has its own repository.                  | Clear ownership boundaries; isolated CI    | Cross-repo coordination; workflow duplication |
 
-**Current approach:** [MONO-REPO / MULTI-REPO / HYBRID]
+**Current approach:** MONO-REPO
 
-Repository list (if multi-repo):
+The repository contains the following top-level structure:
 
-| Repository                        | Contents                  | Primary Language | Team        |
-|-----------------------------------|---------------------------|------------------|-------------|
-| [ORG/REPO-NAME]                   | [SERVICE OR COMPONENT]    | [LANGUAGE]       | [TEAM NAME] |
-| [ORG/REPO-NAME]                   | [SERVICE OR COMPONENT]    | [LANGUAGE]       | [TEAM NAME] |
-| [ORG/REPO-NAME]                   | Infrastructure as Code    | Bicep / Terraform| [TEAM NAME] |
+| Directory / File          | Contents                                 | Primary Language     |
+|---------------------------|------------------------------------------|----------------------|
+| `backend/`                | Express.js API server with Prisma ORM    | TypeScript (Node.js) |
+| `frontend/`               | React SPA built with Vite                | TypeScript (React)   |
+| `infra/`                  | Infrastructure as Code (Bicep templates) | Bicep                |
+| `.github/workflows/`      | CI/CD workflow definitions               | YAML                 |
+| `docker-compose.yml`      | Local development environment            | YAML                 |
 
 ---
 
 ## 4. Workflow Inventory
 
-| Workflow Name            | Trigger                          | Purpose                            | File Path                          | Target Environments        |
-|--------------------------|----------------------------------|------------------------------------|------------------------------------|----------------------------|
-| [BUILD-WORKFLOW]         | `push` to `main`, `pull_request` | Build, lint, unit test             | `.github/workflows/build.yml`      | N/A (CI only)              |
-| [DEPLOY-DEV]             | Workflow completion (build)      | Deploy to Dev                      | `.github/workflows/deploy-dev.yml` | Dev                        |
-| [DEPLOY-STAGING]         | Manual / on release branch push  | Deploy to Staging                  | `.github/workflows/deploy-stg.yml` | Staging                    |
-| [DEPLOY-PRODUCTION]      | Manual with approval             | Deploy to Production               | `.github/workflows/deploy-prd.yml` | Production                 |
-| [INFRA-PLAN]             | `pull_request` (IaC paths)       | Terraform/Bicep plan               | `.github/workflows/infra-plan.yml` | All                        |
-| [INFRA-APPLY]            | `push` to `main` (IaC paths)    | Terraform/Bicep apply              | `.github/workflows/infra-apply.yml`| Per environment            |
-| [SCHEDULED-SECURITY]     | `schedule` (cron)                | Dependency & container scanning    | `.github/workflows/security.yml`   | N/A                        |
-| [ADD MORE AS NEEDED]     |                                  |                                    |                                    |                            |
+| Workflow Name            | Trigger                                     | Purpose                                        | File Path                             | Target Environments        |
+|--------------------------|---------------------------------------------|------------------------------------------------|---------------------------------------|----------------------------|
+| **CI**                   | PR to `main`/`develop`, push to `develop`   | Build, lint, type-check, test, security scan   | `.github/workflows/ci.yml`            | N/A (CI only)              |
+| **CD**                   | Push to `main`, manual `workflow_dispatch`   | Build Docker images, push to ACR, deploy to Azure Container Apps | `.github/workflows/cd.yml` | Production                 |
+| **Infrastructure**       | Manual `workflow_dispatch` (plan or deploy)  | Azure resource provisioning via Bicep          | `.github/workflows/infrastructure.yml`| Production                 |
 
 ---
 
 ## 5. GitHub Environments Configuration
 
-| Environment   | URL                            | Protection Rules                                              | Deployment Branch Filter   |
-|---------------|--------------------------------|---------------------------------------------------------------|----------------------------|
-| **Dev**       | [DEV-URL]                      | None (auto-deploy)                                            | `main`, `develop`, `feature/*` |
-| **Staging**   | [STAGING-URL]                  | Required reviewers: [REVIEWER-LIST]; Wait timer: [MINUTES] min | `main`, `release/*`        |
-| **Production**| [PRODUCTION-URL]               | Required reviewers: [REVIEWER-LIST]; Wait timer: [MINUTES] min; Admin override only | `main`, `release/*` |
+| Environment   | URL                                       | Protection Rules                         | Deployment Branch Filter   |
+|---------------|-------------------------------------------|------------------------------------------|----------------------------|
+| **Development** | http://localhost:5173 (frontend), http://localhost:3001 (backend) | None (local Docker Compose)     | Any branch               |
+| **Production**| https://cmmc.intellisecops.com (frontend), https://api.cmmc.intellisecops.com (backend) | Push to `main` triggers CD | `main`                   |
+| **Staging**   | Not yet configured                        | Planned                                  | Planned                   |
 
 ### Environment-Specific Variables (non-secret)
 
-| Variable Name                | Dev                  | Staging              | Production           |
-|------------------------------|----------------------|----------------------|----------------------|
-| `AZURE_SUBSCRIPTION_ID`     | [DEV-SUB-ID]        | [STG-SUB-ID]        | [PRD-SUB-ID]        |
-| `AZURE_RESOURCE_GROUP`      | [DEV-RG]            | [STG-RG]            | [PRD-RG]            |
-| `APP_URL`                   | [DEV-URL]           | [STG-URL]           | [PRD-URL]           |
-| [ADD MORE AS NEEDED]        |                      |                      |                      |
+| Variable Name                | Development (Local)          | Production                       |
+|------------------------------|------------------------------|----------------------------------|
+| `VITE_API_URL`               | `http://localhost:3001`      | `https://api.cmmc.intellisecops.com` |
+| Azure Resource Group         | N/A                          | `rg-cmmc-assessor-prod`         |
+| Azure Region                 | N/A                          | Canada Central                   |
 
 ---
 
@@ -105,22 +91,25 @@ Repository list (if multi-repo):
 
 ### 6.1 GitHub Secrets
 
-| Secret Name                  | Scope             | Description                          | Rotation Schedule     |
-|------------------------------|--------------------|--------------------------------------|-----------------------|
-| `AZURE_CLIENT_ID`           | Environment        | Azure AD app registration client ID  | [ROTATION-SCHEDULE]   |
-| `AZURE_TENANT_ID`           | Organization       | Azure AD tenant ID                   | N/A                   |
-| `AZURE_SUBSCRIPTION_ID`     | Environment        | Target Azure subscription            | N/A                   |
-| [ADD MORE AS NEEDED]        |                    |                                      |                       |
+| Secret Name                  | Scope             | Description                              | Rotation Schedule     |
+|------------------------------|--------------------|------------------------------------------|-----------------------|
+| `AZURE_CLIENT_ID`           | Repository         | Azure AD app registration client ID (OIDC) | On credential rotation |
+| `AZURE_TENANT_ID`           | Repository         | Azure AD tenant ID                       | N/A                   |
+| `AZURE_SUBSCRIPTION_ID`     | Repository         | Target Azure subscription                | N/A                   |
+| `DB_ADMIN_PASSWORD`         | Repository         | PostgreSQL Flexible Server admin password | Quarterly             |
+| `JWT_SECRET`                | Repository         | JWT signing secret for backend auth      | Quarterly             |
+| `ENTRA_CLIENT_ID`           | Repository         | Microsoft Entra ID client ID             | On credential rotation |
+| `ENTRA_CLIENT_SECRET`       | Repository         | Microsoft Entra ID client secret         | On credential rotation |
+| `TOKEN_ENCRYPTION_KEY`      | Repository         | Encryption key for token storage         | Quarterly             |
+| `API_URL`                   | Repository         | Backend API URL for deployment config    | N/A                   |
 
 ### 6.2 Azure Key Vault Integration
 
-- **Key Vault name per environment:**
-  - Dev: `[DEV-KEYVAULT-NAME]`
-  - Staging: `[STG-KEYVAULT-NAME]`
-  - Production: `[PRD-KEYVAULT-NAME]`
-- **Access method:** [OIDC federation / Service Principal]
-- **Secrets consumed at:** [Build time / Deploy time / Runtime]
-- **Key Vault reference pattern:** Application settings reference Key Vault URIs so secrets are never stored in app config.
+- **Key Vault name:** Provisioned via Bicep (`main.bicep` includes Key Vault resource)
+- **Production Key Vault:** Deployed as part of `rg-cmmc-assessor-prod` resource group
+- **Access method:** OIDC federation
+- **Secrets consumed at:** Runtime (Container Apps environment variables reference Key Vault)
+- **Key Vault reference pattern:** Application settings are injected as environment variables into Container Apps at deployment time.
 
 ### 6.3 OIDC Federation for Azure Authentication
 
@@ -128,8 +117,8 @@ We use **OpenID Connect (OIDC) federation** to authenticate GitHub Actions with 
 
 | Configuration Item               | Value                          |
 |----------------------------------|--------------------------------|
-| Azure AD App Registration        | [APP-REGISTRATION-NAME]       |
-| Federated Credential Subject     | `repo:[ORG/REPO]:environment:[ENV]` |
+| Azure AD App Registration        | CMMC Assessor GitHub Actions   |
+| Federated Credential Subject     | `repo:IntelliSecOps/cmmc-assessor:ref:refs/heads/main` |
 | Audience                         | `api://AzureADTokenExchange`  |
 | GitHub Actions action            | `azure/login@v2`              |
 
@@ -139,43 +128,35 @@ We use **OpenID Connect (OIDC) federation** to authenticate GitHub Actions with 
 
 ### Reusable Workflows
 
-| Workflow                         | Location                                        | Purpose                                  |
-|----------------------------------|-------------------------------------------------|------------------------------------------|
-| [REUSABLE-BUILD]                 | `.github/workflows/reusable-build.yml`          | Standard build, test, and artifact publish |
-| [REUSABLE-DEPLOY]                | `.github/workflows/reusable-deploy.yml`         | Deploy to any Azure environment           |
-| [REUSABLE-INFRA]                 | `.github/workflows/reusable-infra.yml`          | Terraform/Bicep plan and apply            |
-| [ADD MORE AS NEEDED]             |                                                 |                                          |
+Currently, the project does not use reusable workflows or composite actions. Each of the three workflows (CI, CD, Infrastructure) is self-contained.
 
-### Composite Actions
+### Planned Improvements
 
-| Action                           | Location                                        | Purpose                                  |
-|----------------------------------|-------------------------------------------------|------------------------------------------|
-| [SETUP-DOTNET]                   | `.github/actions/setup-dotnet/action.yml`       | Install .NET SDK with caching            |
-| [RUN-TESTS]                      | `.github/actions/run-tests/action.yml`          | Execute tests and publish results        |
-| [ADD MORE AS NEEDED]             |                                                 |                                          |
+| Improvement                      | Description                                           | Priority    |
+|----------------------------------|-------------------------------------------------------|-------------|
+| Extract shared Node.js setup     | Create a composite action for checkout + Node 20 setup + npm ci | Medium |
+| Extract Docker build steps       | Create a reusable workflow for multi-stage Docker builds | Low       |
 
 ---
 
 ## 8. Workflow Status Badges
 
-Add these badges to repository README files for at-a-glance pipeline health.
+Add these badges to the repository README for at-a-glance pipeline health.
 
 | Workflow         | Badge                                                                                         |
 |------------------|-----------------------------------------------------------------------------------------------|
-| Build            | `![Build](https://github.com/[ORG]/[REPO]/actions/workflows/build.yml/badge.svg)`            |
-| Deploy Staging   | `![Deploy Staging](https://github.com/[ORG]/[REPO]/actions/workflows/deploy-stg.yml/badge.svg)` |
-| Deploy Production| `![Deploy Prod](https://github.com/[ORG]/[REPO]/actions/workflows/deploy-prd.yml/badge.svg)` |
-| Security Scan    | `![Security](https://github.com/[ORG]/[REPO]/actions/workflows/security.yml/badge.svg)`      |
+| CI               | `![CI](https://github.com/IntelliSecOps/cmmc-assessor/actions/workflows/ci.yml/badge.svg)`   |
+| CD               | `![CD](https://github.com/IntelliSecOps/cmmc-assessor/actions/workflows/cd.yml/badge.svg)`   |
+| Infrastructure   | `![Infra](https://github.com/IntelliSecOps/cmmc-assessor/actions/workflows/infrastructure.yml/badge.svg)` |
 
 ---
 
 ## 9. Branch Protection Rules
 
-| Branch        | Required Reviews | Required Status Checks                        | Dismiss Stale Reviews | Require Signed Commits | Restrict Pushes To        | Allow Force Push |
-|---------------|------------------|------------------------------------------------|-----------------------|------------------------|---------------------------|------------------|
-| `main`        | [NUMBER]         | `build`, `lint`, `unit-test`, `security-scan`  | Yes                   | [YES/NO]               | [TEAM OR ROLE]            | No               |
-| `develop`     | [NUMBER]         | `build`, `lint`, `unit-test`                   | Yes                   | [YES/NO]               | [TEAM OR ROLE]            | No               |
-| `release/*`   | [NUMBER]         | `build`, `integration-test`                    | Yes                   | [YES/NO]               | [TEAM OR ROLE]            | No               |
+| Branch        | Required Reviews | Required Status Checks                                        | Dismiss Stale Reviews | Require Signed Commits | Allow Force Push |
+|---------------|------------------|---------------------------------------------------------------|-----------------------|------------------------|------------------|
+| `main`        | 1                | `backend-ci`, `frontend-ci`, `security-scan`, `dependency-audit` | Yes                | No                     | No               |
+| `develop`     | 1                | `backend-ci`, `frontend-ci`                                   | Yes                   | No                     | No               |
 
 ---
 
@@ -183,11 +164,11 @@ Add these badges to repository README files for at-a-glance pipeline health.
 
 ### Key Contacts
 
-| Role                     | Name              | GitHub Handle      |
-|--------------------------|-------------------|--------------------|
-| CI/CD Pipeline Owner     | [NAME]            | @[HANDLE]          |
-| Platform / DevOps Lead   | [NAME]            | @[HANDLE]          |
-| Security Champion        | [NAME]            | @[HANDLE]          |
+| Role                     | Name                    | GitHub Handle      |
+|--------------------------|-------------------------|--------------------|
+| CI/CD Pipeline Owner     | IntelliSecOps DevOps    | @intellisecops     |
+| Platform / DevOps Lead   | IntelliSecOps DevOps    | @intellisecops     |
+| Security Champion        | IntelliSecOps Security  | @intellisecops     |
 
 ### Related Pages
 

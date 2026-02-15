@@ -2,10 +2,10 @@
 
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
-| Page Title       | Runbook -- [PROJECT NAME]          |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Approved]     |
-| Owner            | [TEAM OR INDIVIDUAL NAME]          |
+| Page Title       | Runbook -- CMMC Assessor Platform  |
+| Last Updated     | 2026-02-14                         |
+| Status           | Draft                              |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
@@ -13,65 +13,75 @@
 
 | Attribute                    | Value                                                 |
 |------------------------------|-------------------------------------------------------|
-| Application Name             | [PROJECT NAME]                                        |
-| Description                  | [BRIEF DESCRIPTION OF WHAT THE APPLICATION DOES]      |
-| Business Criticality         | [Tier 1 / Tier 2 / Tier 3]                            |
-| Primary On-Call Team         | [TEAM NAME]                                           |
-| On-Call Rotation Tool        | [PagerDuty / OpsGenie / Azure On-Call]                |
-| Primary Region               | [East US]                                             |
-| DR Region                    | [West US]                                             |
-| Source Repository             | [https://github.com/ORG/REPO]                        |
-| IaC Repository               | [https://github.com/ORG/INFRA-REPO]                  |
-| CI/CD Pipeline               | [GitHub Actions]                                      |
+| Application Name             | CMMC Assessor Platform                                |
+| Description                  | A web-based platform for conducting CMMC (Cybersecurity Maturity Model Certification) assessments, managing assessment workflows, and generating compliance reports |
+| Business Criticality         | Tier 2                                                |
+| Primary On-Call Team         | NOT IMPLEMENTED -- no on-call rotation                |
+| On-Call Rotation Tool        | NOT IMPLEMENTED                                       |
+| Primary Region               | Canada Central                                        |
+| DR Region                    | NOT IMPLEMENTED                                       |
+| Source Repository             | GitHub (refer to team for repository URL)            |
+| IaC Repository               | Same repository (infrastructure/ directory)          |
+| CI/CD Pipeline               | GitHub Actions                                        |
 
 ---
 
 ## 2. Architecture Summary
 
 ```
-[INSERT SIMPLIFIED ARCHITECTURE DIAGRAM FOR ON-CALL REFERENCE]
+Internet
+   |
+   +-- cmmc.intellisecops.com (CNAME)
+   |      v
+   |   cmmc-web (Container App, 0.25 CPU, 0.5Gi, 0-3 replicas)
+   |      Next.js frontend
+   |
+   +-- api.cmmc.intellisecops.com (CNAME)
+          v
+       cmmc-api (Container App, 0.5 CPU, 1Gi, 0-3 replicas)
+          Node.js/Express API
+             |
+             +-- psql-cmmc-assessor-prod (PostgreSQL Flexible, B1ms)
+             |      Prisma ORM, AuditLog table
+             +-- stcmmcassessorprod (Storage Account, Standard_LRS)
+             +-- kv-cmmc-assessor-prod (Key Vault)
 
-This should be a high-level diagram showing:
-- User traffic flow (Internet -> Front Door/AGW -> AKS/App Service)
-- Backend services (Functions, VMs)
-- Data stores (SQL, Storage, Cache)
-- External dependencies
-- Monitoring (Application Insights)
+Supporting:
+   +-- acrcmmcassessorprod (Container Registry, Basic)
+   +-- log-cmmc-assessor-prod (Log Analytics, 30-day retention)
+   +-- cae-cmmc-assessor-prod (Container Apps Environment, Consumption)
 ```
 
 ### Key Components
 
 | Component               | Azure Service              | Resource Name                   | Resource Group              | Purpose                              |
 |--------------------------|----------------------------|---------------------------------|-----------------------------|--------------------------------------|
-| Web Frontend            | [App Service]               | [app-web-prod-eus-001]          | [rg-app-prod-eus-001]      | [User-facing web application]        |
-| API Layer               | [AKS]                      | [aks-app-prod-eus-001]          | [rg-app-prod-eus-001]      | [REST API services]                  |
-| Background Jobs         | [Azure Functions]           | [func-proc-prod-eus-001]        | [rg-app-prod-eus-001]      | [Async processing, scheduled tasks]  |
-| Legacy Service          | [Virtual Machine]           | [vm-legacy-prod-eus-001]        | [rg-app-prod-eus-001]      | [Legacy backend service]             |
-| Primary Database        | [Azure SQL Database]        | [sql-db-prod-eus-001]           | [rg-data-prod-eus-001]     | [Relational data store]              |
-| Cache                   | [Azure Cache for Redis]     | [redis-app-prod-eus-001]        | [rg-data-prod-eus-001]     | [Session and data caching]           |
-| Blob Storage            | [Azure Storage]             | [stapprodeus001]                | [rg-data-prod-eus-001]     | [File and blob storage]              |
-| Message Queue           | [Azure Service Bus]         | [sb-app-prod-eus-001]           | [rg-app-prod-eus-001]      | [Async messaging]                    |
-| Secrets                 | [Azure Key Vault]           | [kv-app-prod-eus-001]           | [rg-infra-prod-eus-001]    | [Secrets and certificate management] |
+| Web Frontend            | Container Apps              | cmmc-web                        | rg-cmmc-assessor-prod       | Next.js user-facing web application  |
+| API Layer               | Container Apps              | cmmc-api                        | rg-cmmc-assessor-prod       | Node.js/Express REST API             |
+| Primary Database        | PostgreSQL Flexible Server  | psql-cmmc-assessor-prod         | rg-cmmc-assessor-prod       | Relational data store (Prisma ORM)   |
+| Blob Storage            | Storage Account             | stcmmcassessorprod              | rg-cmmc-assessor-prod       | File and document storage            |
+| Secrets                 | Key Vault                   | kv-cmmc-assessor-prod           | rg-cmmc-assessor-prod       | Secrets and configuration management |
+| Container Images        | Container Registry          | acrcmmcassessorprod             | rg-cmmc-assessor-prod       | Docker image storage                 |
+| Logs                    | Log Analytics Workspace     | log-cmmc-assessor-prod          | rg-cmmc-assessor-prod       | Centralized log aggregation          |
 
 ---
 
 ## 3. Key URLs and Endpoints
 
-| Environment | Application URL                  | Health Check Endpoint              | Status Page                     | Azure Portal Link                   |
-|-------------|----------------------------------|------------------------------------|---------------------------------|-------------------------------------|
-| Production  | [https://app.company.com]        | [https://app.company.com/health]   | [https://status.company.com]    | [AZURE PORTAL DEEP LINK]           |
-| Staging     | [https://staging.company.com]    | [https://staging.company.com/health]| [N/A]                          | [AZURE PORTAL DEEP LINK]           |
-| Development | [https://dev.internal.company.com]| [https://dev.internal.company.com/health] | [N/A]                   | [AZURE PORTAL DEEP LINK]           |
+| Environment | Application URL                          | Health Check Endpoint                        | Status Page                     |
+|-------------|------------------------------------------|----------------------------------------------|---------------------------------|
+| Production  | https://cmmc.intellisecops.com           | https://api.cmmc.intellisecops.com/api/health | N/A (no status page)           |
+
+> **Note:** The health endpoint (`GET /api/health`) currently leaks configuration information (security finding F-38). This should be remediated to return only a status indicator.
 
 ### Monitoring URLs
 
 | Tool                    | URL                                              | Purpose                       |
 |-------------------------|--------------------------------------------------|-------------------------------|
-| Azure Portal            | [https://portal.azure.com]                       | Resource management           |
-| Application Insights    | [DIRECT LINK TO APP INSIGHTS DASHBOARD]          | Application telemetry         |
-| Grafana Dashboard       | [https://grafana.company.com/d/DASHBOARD_ID]     | Custom metrics dashboard      |
-| Log Analytics           | [DIRECT LINK TO LOG ANALYTICS WORKSPACE]         | Log queries                   |
-| Alert Dashboard         | [DIRECT LINK TO AZURE MONITOR ALERTS]            | Active alert management       |
+| Azure Portal            | https://portal.azure.com                         | Resource management           |
+| Log Analytics           | Azure Portal > log-cmmc-assessor-prod            | Log queries (KQL)             |
+
+> **Note:** Application Insights is NOT IMPLEMENTED. There is no Grafana dashboard or custom alerting dashboard.
 
 ---
 
@@ -81,209 +91,157 @@ This should be a high-level diagram showing:
 
 | #  | Procedure                        | When to Use                                        | Estimated Duration |
 |----|----------------------------------|----------------------------------------------------|--------------------|
-| 4.1 | Application Restart             | Unresponsive application, memory leak suspected   | 5-10 minutes       |
-| 4.2 | Scale Up / Scale Down           | High load or cost optimization                    | 5-15 minutes       |
-| 4.3 | Database Maintenance            | Scheduled maintenance, index rebuild              | 30-60 minutes      |
-| 4.4 | Certificate Renewal             | Certificate approaching expiry                    | 15-30 minutes      |
-| 4.5 | Log Retrieval                   | Investigating issues, audit requests              | 5-15 minutes       |
-| 4.6 | Cache Clear                     | Stale data, cache corruption suspected            | 5 minutes          |
-| 4.7 | Feature Flag Toggle             | Enable/disable feature in production              | 5 minutes          |
+| 4.1 | Container App Restart           | Unresponsive application, memory issues            | 2-5 minutes        |
+| 4.2 | Scale Up / Scale Down           | High load or cost optimization                     | 2-5 minutes        |
+| 4.3 | Database Maintenance            | Performance issues, storage concerns               | 15-30 minutes      |
+| 4.4 | Log Retrieval                   | Investigating issues, audit requests               | 5-15 minutes       |
+| 4.5 | Force New Deployment            | Stuck deployment, container image update            | 5-10 minutes       |
+| 4.6 | Database Backup Restore         | Data recovery needed                                | 30-60 minutes      |
 
 ---
 
-### 4.1 Application Restart
+### 4.1 Container App Restart
 
-**When to Use:** Application is unresponsive, returning 5xx errors consistently, or memory usage is abnormally high with no other clear cause.
+**When to Use:** Application is unresponsive, returning 5xx errors consistently, or container is in a crash loop.
 
 **Prerequisites:**
-- [ ] Azure portal access or Azure CLI configured
-- [ ] Confirm the issue is not caused by an upstream dependency
+- [ ] Azure CLI installed and logged in (`az login`)
+- [ ] Confirm the issue is not caused by a database or upstream dependency
 
 **Steps:**
 
 | Step | Action                                                                          | Command / Instructions                                                  |
 |------|---------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| 1    | Verify current application status                                               | Check health endpoint: `curl https://app.company.com/health`            |
-| 2    | Check Application Insights for errors                                           | Navigate to App Insights > Failures blade                               |
-| 3    | **App Service restart**                                                          | `az webapp restart --name [APP_NAME] --resource-group [RG_NAME]`        |
-| 4    | **AKS pod restart** (specific deployment)                                       | `kubectl rollout restart deployment/[DEPLOYMENT_NAME] -n [NAMESPACE]`   |
-| 5    | **Azure Functions restart**                                                      | `az functionapp restart --name [FUNC_NAME] --resource-group [RG_NAME]`  |
-| 6    | **VM restart**                                                                   | `az vm restart --name [VM_NAME] --resource-group [RG_NAME]`             |
-| 7    | Wait for service to become healthy (allow [XX] seconds warm-up)                 | Monitor health endpoint and Application Insights                        |
+| 1    | Verify current application status                                               | `curl -s https://api.cmmc.intellisecops.com/api/health`                 |
+| 2    | Check Container App status                                                      | `az containerapp show --name cmmc-api --resource-group rg-cmmc-assessor-prod --query "properties.runningStatus"` |
+| 3    | Restart the backend API Container App                                           | `az containerapp revision restart --name cmmc-api --resource-group rg-cmmc-assessor-prod --revision $(az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod --query "[0].name" -o tsv)` |
+| 4    | Restart the frontend Web Container App                                          | `az containerapp revision restart --name cmmc-web --resource-group rg-cmmc-assessor-prod --revision $(az containerapp revision list --name cmmc-web --resource-group rg-cmmc-assessor-prod --query "[0].name" -o tsv)` |
+| 5    | Alternatively, create a new revision to force restart                           | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --set-env-vars RESTART_TRIGGER=<timestamp>` |
+| 6    | Wait for the service to become healthy (allow 30-60 seconds for cold start)     | `curl -s https://api.cmmc.intellisecops.com/api/health`                 |
 
 **Verification:**
 - [ ] Health check endpoint returns 200 OK
-- [ ] Application Insights shows successful requests
-- [ ] No new 5xx errors in the last 5 minutes
+- [ ] Application is accessible at https://cmmc.intellisecops.com
+- [ ] Check Log Analytics for new errors in the last 5 minutes
 
-**Rollback:** If restart does not resolve the issue, escalate to [ESCALATION CONTACT] and consider rolling back to the previous deployment version.
+**Rollback:** If restart does not resolve the issue, consider redeploying the previous container image (see Section 4.5 or Rollback Procedures document).
 
 ---
 
 ### 4.2 Scale Up / Scale Down
 
-**When to Use:** Sustained high CPU/memory usage (>80% for 15+ minutes) or planned high-traffic events; or scaling down after traffic normalizes.
+**When to Use:** Sustained high response times, or scaling down after traffic normalizes to reduce cost.
 
 **Prerequisites:**
-- [ ] Confirm scaling limits with budget owner for cost implications
-- [ ] Verify current resource utilization metrics
+- [ ] Azure CLI installed and logged in
+- [ ] Understand cost implications (Container Apps consumption billing)
 
 **Steps:**
 
 | Step | Action                                                                 | Command / Instructions                                                                       |
 |------|------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
-| 1    | Check current metrics (CPU, memory, request count)                     | Azure Portal > Metrics blade or Grafana dashboard                                            |
-| 2    | **AKS: Scale node pool**                                               | `az aks nodepool scale --cluster-name [AKS_NAME] --name [POOL_NAME] --node-count [N] --resource-group [RG_NAME]` |
-| 3    | **AKS: Scale deployment replicas**                                     | `kubectl scale deployment/[DEPLOYMENT_NAME] --replicas=[N] -n [NAMESPACE]`                   |
-| 4    | **App Service: Scale up (change tier)**                                | `az appservice plan update --name [PLAN_NAME] --resource-group [RG_NAME] --sku [SKU]`        |
-| 5    | **App Service: Scale out (add instances)**                             | `az appservice plan update --name [PLAN_NAME] --resource-group [RG_NAME] --number-of-workers [N]` |
-| 6    | **VM: Resize**                                                          | `az vm resize --name [VM_NAME] --resource-group [RG_NAME] --size [NEW_SIZE]`                 |
-| 7    | Monitor metrics after scaling                                          | Verify CPU/memory reduced, response times improved                                           |
+| 1    | Check current replica count                                            | `az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod --query "[].{name:name, replicas:properties.replicas}" -o table` |
+| 2    | Scale backend API (adjust max replicas)                                | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --min-replicas 1 --max-replicas 5` |
+| 3    | Scale frontend web (adjust max replicas)                               | `az containerapp update --name cmmc-web --resource-group rg-cmmc-assessor-prod --min-replicas 1 --max-replicas 5` |
+| 4    | To scale back down (restore defaults)                                  | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --min-replicas 0 --max-replicas 3` |
+| 5    | To disable scale-to-zero temporarily (prevent cold starts)             | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --min-replicas 1` |
+| 6    | Monitor response times after scaling                                   | Check Log Analytics for request duration                                                     |
 
 **Verification:**
-- [ ] Resource metrics show reduced utilization
+- [ ] New replica count confirmed
 - [ ] Response times within acceptable thresholds
 - [ ] No errors introduced by scaling operation
 
-**Rollback:** Reverse the scaling operation using the same commands with the original values.
+**Rollback:** Reverse the scaling operation using the same commands with the original values (`--min-replicas 0 --max-replicas 3`).
 
 ---
 
 ### 4.3 Database Maintenance
 
-**When to Use:** Scheduled maintenance windows, index fragmentation >30%, long-running query performance degradation.
+**When to Use:** Slow queries, storage approaching capacity, or scheduled maintenance.
 
 **Prerequisites:**
-- [ ] Maintenance window confirmed with stakeholders
-- [ ] Database backup verified
-- [ ] Read replica available for queries during maintenance
+- [ ] Access to PostgreSQL via psql or Azure Portal
+- [ ] Maintenance window communicated to team
 
 **Steps:**
 
 | Step | Action                                                           | Command / Instructions                                                      |
 |------|------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| 1    | Verify latest backup exists                                      | Azure Portal > SQL Database > Backups                                       |
-| 2    | Check index fragmentation                                        | Run: `SELECT * FROM sys.dm_db_index_physical_stats(...)`                    |
-| 3    | Rebuild fragmented indexes                                       | Run: `ALTER INDEX ALL ON [TABLE] REBUILD`                                   |
-| 4    | Update statistics                                                | Run: `EXEC sp_updatestats`                                                  |
-| 5    | Check for long-running queries                                   | Query `sys.dm_exec_requests` for queries running > [XX] seconds             |
-| 6    | Verify DTU/vCore usage post-maintenance                          | Azure Portal > SQL Database > Metrics                                       |
+| 1    | Check database storage usage                                     | `az postgres flexible-server show --name psql-cmmc-assessor-prod --resource-group rg-cmmc-assessor-prod --query "{storageSizeGb:storage.storageSizeGb, storageUsed:storage.storageUsedInMb}"` |
+| 2    | Check active connections                                         | Connect via psql: `SELECT count(*) FROM pg_stat_activity;`                  |
+| 3    | Identify slow queries                                            | `SELECT pid, now() - pg_stat_activity.query_start AS duration, query FROM pg_stat_activity WHERE state = 'active' ORDER BY duration DESC;` |
+| 4    | Run VACUUM ANALYZE on tables                                     | `VACUUM ANALYZE;`                                                           |
+| 5    | Check index health                                               | `SELECT schemaname, tablename, indexname, idx_scan FROM pg_stat_user_indexes ORDER BY idx_scan ASC;` |
+| 6    | Check Prisma migration status                                   | `npx prisma migrate status` (from application directory)                    |
+| 7    | Verify database performance post-maintenance                    | Check query response times via application health endpoint                  |
 
 **Verification:**
-- [ ] Index fragmentation levels acceptable (<10%)
-- [ ] Query performance metrics improved
-- [ ] No blocked queries or deadlocks
-
-**Rollback:** Index rebuilds do not require rollback. If performance degrades, restore from the latest backup.
+- [ ] Storage usage within acceptable limits (<80%)
+- [ ] No long-running queries blocking operations
+- [ ] Application response times normal
 
 ---
 
-### 4.4 Certificate Renewal
-
-**When to Use:** Certificate expires within 30 days, certificate renewal alert triggered.
-
-**Prerequisites:**
-- [ ] Access to Azure Key Vault
-- [ ] New certificate obtained from CA (if not auto-renewed)
-
-**Steps:**
-
-| Step | Action                                                              | Command / Instructions                                                   |
-|------|---------------------------------------------------------------------|--------------------------------------------------------------------------|
-| 1    | Check current certificate expiry                                    | `az keyvault certificate show --vault-name [KV_NAME] --name [CERT_NAME]`|
-| 2    | Import new certificate to Key Vault (if manual)                     | `az keyvault certificate import --vault-name [KV_NAME] --name [CERT_NAME] --file [CERT_FILE]` |
-| 3    | Update Application Gateway SSL binding (if applicable)              | Azure Portal > Application Gateway > Listeners > Update certificate      |
-| 4    | Update AKS TLS secret (if applicable)                               | `kubectl create secret tls [SECRET_NAME] --cert=[CRT] --key=[KEY] -n [NS] --dry-run=client -o yaml \| kubectl apply -f -` |
-| 5    | Restart affected services to pick up new certificate                | Restart App Service / AKS pods as per Section 4.1                        |
-| 6    | Verify HTTPS connectivity with new certificate                      | `curl -vI https://app.company.com 2>&1 \| grep -i "expire"`             |
-
-**Verification:**
-- [ ] New certificate shows correct expiry date (>11 months)
-- [ ] HTTPS connections successful with no certificate warnings
-- [ ] SSL Labs test shows A+ rating (if public-facing)
-
-**Rollback:** Re-import the previous certificate from Key Vault backup if the new certificate causes issues.
-
----
-
-### 4.5 Log Retrieval
+### 4.4 Log Retrieval
 
 **When to Use:** Investigating production issues, responding to audit requests, debugging customer-reported problems.
 
 **Prerequisites:**
-- [ ] Access to Log Analytics workspace
-- [ ] Application Insights access
+- [ ] Access to Azure Portal / Log Analytics workspace
 
 **Steps:**
 
 | Step | Action                                                        | Command / Instructions                                                               |
 |------|---------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| 1    | **Application logs (App Insights)**                           | App Insights > Logs > `traces \| where timestamp > ago(1h) \| where message contains "[SEARCH_TERM]"` |
-| 2    | **Request logs**                                               | App Insights > Logs > `requests \| where timestamp > ago(1h) \| where resultCode >= 500` |
-| 3    | **AKS container logs**                                        | `kubectl logs deployment/[DEPLOYMENT_NAME] -n [NAMESPACE] --tail=500`                |
-| 4    | **AKS container logs (previous instance)**                    | `kubectl logs deployment/[DEPLOYMENT_NAME] -n [NAMESPACE] --previous`                |
-| 5    | **Azure resource logs (Log Analytics)**                       | Log Analytics > `AzureDiagnostics \| where ResourceType == "[TYPE]" \| where TimeGenerated > ago(1h)` |
-| 6    | **VM logs**                                                    | Connect via Bastion, check `/var/log/` or Windows Event Viewer                       |
-| 7    | **Export logs for external sharing**                           | App Insights > Logs > Export to CSV                                                  |
+| 1    | **Container App logs (backend API)**                          | Azure Portal > log-cmmc-assessor-prod > Logs: `ContainerAppConsoleLogs_CL \| where ContainerAppName_s == "cmmc-api" \| where TimeGenerated > ago(1h) \| order by TimeGenerated desc` |
+| 2    | **Container App logs (frontend)**                             | `ContainerAppConsoleLogs_CL \| where ContainerAppName_s == "cmmc-web" \| where TimeGenerated > ago(1h) \| order by TimeGenerated desc` |
+| 3    | **System logs for Container Apps**                            | `ContainerAppSystemLogs_CL \| where TimeGenerated > ago(1h) \| order by TimeGenerated desc` |
+| 4    | **Search for specific error messages**                        | `ContainerAppConsoleLogs_CL \| where Log_s contains "error" \| where TimeGenerated > ago(24h) \| order by TimeGenerated desc` |
+| 5    | **Via Azure CLI (stream logs)**                               | `az containerapp logs show --name cmmc-api --resource-group rg-cmmc-assessor-prod --follow` |
+| 6    | **Export logs for external sharing**                          | Azure Portal > Log Analytics > Logs > Export to CSV                                  |
+
+> **Note:** Logs are currently console.log based (unstructured). Searching for specific issues may require keyword searching. Structured logging is planned (F-30).
 
 **Verification:**
 - [ ] Relevant log entries retrieved successfully
 - [ ] Sensitive data redacted before sharing externally
 
-**Rollback:** N/A -- read-only operation.
-
 ---
 
-### 4.6 Cache Clear
+### 4.5 Force New Deployment
 
-**When to Use:** Stale data suspected, cache corruption, after major data migration.
-
-**Prerequisites:**
-- [ ] Confirm clearing cache will not cause a thundering herd problem (gradual warm-up preferred)
-- [ ] Notify team of potential temporary performance degradation
+**When to Use:** Need to redeploy the current or a specific container image, or deploy a hotfix.
 
 **Steps:**
 
-| Step | Action                                                              | Command / Instructions                                                   |
-|------|---------------------------------------------------------------------|--------------------------------------------------------------------------|
-| 1    | Check current cache metrics (hit rate, memory)                      | Azure Portal > Redis Cache > Metrics                                     |
-| 2    | **Clear specific cache keys (preferred)**                           | `redis-cli -h [REDIS_HOST] -p 6380 -a [PASSWORD] --tls DEL [KEY_PATTERN]` |
-| 3    | **Flush entire cache (use with caution)**                           | `redis-cli -h [REDIS_HOST] -p 6380 -a [PASSWORD] --tls FLUSHALL`        |
-| 4    | Monitor application performance after cache clear                   | Watch response times in Application Insights for 15 minutes              |
-
-**Verification:**
-- [ ] Cache metrics show fresh data being populated
-- [ ] Application response times return to normal within [XX] minutes
-- [ ] No increase in database load beyond acceptable thresholds
-
-**Rollback:** Cache will repopulate automatically. If database load spikes, consider rate-limiting or feature-flagging cache-dependent features temporarily.
+| Step | Action                                                                    | Command / Instructions                                                       |
+|------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| 1    | List available images in ACR                                              | `az acr repository show-tags --name acrcmmcassessorprod --repository cmmc-api --output table` |
+| 2    | Deploy a specific image tag to the backend API                            | `az containerapp update --name cmmc-api --resource-group rg-cmmc-assessor-prod --image acrcmmcassessorprod.azurecr.io/cmmc-api:<TAG>` |
+| 3    | Deploy a specific image tag to the frontend                               | `az containerapp update --name cmmc-web --resource-group rg-cmmc-assessor-prod --image acrcmmcassessorprod.azurecr.io/cmmc-web:<TAG>` |
+| 4    | Alternatively, trigger the CD workflow from GitHub                        | Go to GitHub Actions > select workflow > Run workflow (workflow_dispatch)     |
+| 5    | Verify deployment                                                         | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
+| 6    | Check revision status                                                     | `az containerapp revision list --name cmmc-api --resource-group rg-cmmc-assessor-prod -o table` |
 
 ---
 
-### 4.7 Feature Flag Toggle
+### 4.6 Database Backup Restore
 
-**When to Use:** Enabling or disabling a feature in production, emergency feature kill switch.
-
-**Prerequisites:**
-- [ ] Feature flag name confirmed
-- [ ] Impact of toggling assessed
+**When to Use:** Data corruption or accidental deletion requiring point-in-time recovery.
 
 **Steps:**
 
-| Step | Action                                                         | Command / Instructions                                                          |
-|------|----------------------------------------------------------------|---------------------------------------------------------------------------------|
-| 1    | Identify feature flag name and current state                   | Azure App Configuration > Feature Manager > [FLAG_NAME]                         |
-| 2    | Toggle feature flag                                            | `az appconfig feature set --name [APPCONFIG_NAME] --feature [FLAG_NAME] --label [ENVIRONMENT] --yes` |
-| 3    | Enable: `az appconfig feature enable ...`                      | `az appconfig feature enable --name [APPCONFIG_NAME] --feature [FLAG_NAME] --label prod --yes` |
-| 4    | Disable: `az appconfig feature disable ...`                    | `az appconfig feature disable --name [APPCONFIG_NAME] --feature [FLAG_NAME] --label prod --yes` |
-| 5    | Verify application picks up the change (may require restart)   | Check application logs for feature flag refresh                                  |
+| Step | Action                                                                    | Command / Instructions                                                       |
+|------|---------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| 1    | Identify the target restore point (before the issue occurred)             | Determine timestamp in UTC                                                   |
+| 2    | Restore PostgreSQL to a new server                                        | `az postgres flexible-server restore --resource-group rg-cmmc-assessor-prod --name psql-cmmc-assessor-restore --source-server psql-cmmc-assessor-prod --restore-time "YYYY-MM-DDTHH:MM:SSZ"` |
+| 3    | Validate restored database                                                | Connect to the restored server and run validation queries                    |
+| 4    | Update application connection string                                      | Update Key Vault secret with new server hostname, then restart Container Apps |
+| 5    | Verify application connectivity                                           | `curl -s https://api.cmmc.intellisecops.com/api/health`                      |
+| 6    | Delete old server (if replacing) or swap DNS                              | `az postgres flexible-server delete --name psql-cmmc-assessor-prod --resource-group rg-cmmc-assessor-prod` (use with extreme caution) |
 
-**Verification:**
-- [ ] Feature flag shows correct state in App Configuration
-- [ ] Application behavior matches expected state
-- [ ] No errors introduced by flag toggle
-
-**Rollback:** Toggle the flag back to its previous state using the same commands.
+> **WARNING:** This procedure has never been tested. Estimated time is 30-60 minutes but actual time is unknown.
 
 ---
 
@@ -291,48 +249,51 @@ This should be a high-level diagram showing:
 
 | # | Symptom                                        | Likely Cause                                    | Resolution                                                | Runbook Section |
 |---|------------------------------------------------|-------------------------------------------------|-----------------------------------------------------------|-----------------|
-| 1 | Application returns 503 errors                 | App Service / AKS pods not running              | Restart application (Section 4.1)                         | 4.1             |
-| 2 | High response times (>5 seconds)               | Database CPU high, cache miss rate high         | Check SQL metrics, consider scaling DB or clearing cache  | 4.2, 4.6        |
-| 3 | 500 errors on specific API endpoints           | Application exception, recent deployment issue  | Check App Insights exceptions, consider rollback          | 4.5             |
-| 4 | Database connection timeout errors             | Connection pool exhausted, SQL firewall issue   | Check SQL connections, restart app, verify private endpoint| 4.3            |
-| 5 | SSL certificate warning in browser             | Certificate expired or misconfigured            | Renew certificate (Section 4.4)                           | 4.4             |
-| 6 | Messages not processing from queue             | Functions stopped, Service Bus dead-letter full  | Restart Functions, check dead-letter queue                 | 4.1             |
-| 7 | VM unreachable                                  | VM stopped, NSG blocking, disk full             | Check VM status, restart if needed, check disk space       | 4.1             |
-| 8 | AKS pods in CrashLoopBackOff                   | Application crash, misconfiguration, OOM kill   | Check pod logs, describe pod, check resource limits        | 4.5             |
-| 9 | Deployment pipeline failing                    | GitHub Actions runner issue, credential expired | Check pipeline logs, verify service principal credentials  | N/A             |
-| 10| Sudden spike in 429 (rate limit) errors        | API rate limiting triggered, DDoS attempt       | Check traffic patterns, adjust rate limits or WAF rules    | 4.2             |
+| 1 | Application returns 502/503 errors             | Container App replicas not running (scale-to-zero cold start) | Wait 30-60s for cold start, or set min-replicas to 1 | 4.2             |
+| 2 | Slow API responses (>5 seconds)                | Database connection issues, cold start          | Check database connectivity, restart Container App        | 4.1, 4.3        |
+| 3 | 500 errors on API endpoints                    | Application exception, database migration issue | Check Container App logs in Log Analytics                 | 4.4             |
+| 4 | Database connection timeout                    | Connection pool exhausted, PostgreSQL firewall   | Check PostgreSQL status, restart API Container App        | 4.1, 4.3        |
+| 5 | Container App stuck in provisioning            | Image pull failure, ACR authentication issue    | Check ACR credentials, verify image tag exists             | 4.5             |
+| 6 | Health endpoint returns config info            | Known issue (F-38)                              | Not a runtime issue; remediation planned                  | N/A             |
+| 7 | CORS errors in browser                         | CORS misconfiguration                           | Check Bicep CORS settings, verify allowed origins          | N/A             |
+| 8 | Prisma migration fails on startup             | Schema conflict, database connectivity          | Check migration status, review Prisma logs                 | 4.3, 4.4        |
+| 9 | Deployment pipeline failing                    | GitHub Actions runner issue, ACR push failure   | Check pipeline logs, verify service principal credentials  | N/A             |
+| 10| Cannot access Azure resources                  | Service principal credentials expired           | Rotate credentials in GitHub Secrets                       | N/A             |
 
 ---
 
 ## 6. Escalation Matrix
 
-| Severity | Definition                                  | Response Time | Update Frequency | Escalation Path                                       | Contact Method |
-|----------|---------------------------------------------|---------------|------------------|-------------------------------------------------------|----------------|
-| SEV 1    | Complete outage, all users impacted         | 15 minutes    | Every 30 minutes | On-Call -> SRE Lead -> VP Engineering -> CTO          | [PagerDuty + Phone] |
-| SEV 2    | Partial outage, major feature impacted      | 30 minutes    | Every 60 minutes | On-Call -> SRE Lead -> Engineering Manager            | [PagerDuty + Slack] |
-| SEV 3    | Degraded performance, minor feature issue   | 2 hours       | Every 4 hours    | On-Call -> Team Lead                                   | [Slack + Email]     |
-| SEV 4    | Cosmetic issue, no user impact              | Next business day | Daily          | Logged as ticket                                       | [Jira / Azure DevOps] |
+| Severity | Definition                                  | Response Time      | Update Frequency   | Escalation Path                                       | Contact Method        |
+|----------|---------------------------------------------|--------------------|--------------------|-------------------------------------------------------|-----------------------|
+| SEV 1    | Complete outage, all users impacted         | Best effort        | As needed          | Team lead (no formal escalation path)                 | Email / direct message |
+| SEV 2    | Partial outage, major feature impacted      | Best effort        | As needed          | Team lead                                              | Email / direct message |
+| SEV 3    | Degraded performance, minor feature issue   | Next business day  | Daily              | Logged as issue                                        | Email                  |
+| SEV 4    | Cosmetic issue, no user impact              | Backlog            | N/A                | Logged as issue                                        | Issue tracker          |
+
+> **Status:** Formal escalation paths, response times, and on-call rotations are NOT IMPLEMENTED.
 
 ---
 
 ## 7. Emergency Contacts
 
-| Role                        | Name              | Phone               | Email                      | Slack Handle    | Availability           |
-|-----------------------------|-------------------|----------------------|----------------------------|-----------------|------------------------|
-| Primary On-Call              | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [24/7 rotation]        |
-| Secondary On-Call            | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [24/7 rotation]        |
-| SRE Lead                     | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [Business hours + oncall] |
-| DBA                          | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [Business hours + oncall] |
-| Engineering Manager          | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [Business hours]       |
-| VP Engineering               | [NAME]            | [+1-XXX-XXX-XXXX]   | [email@company.com]        | [@handle]       | [SEV1 only]            |
-| Azure Support                | [N/A]             | [N/A]                | [N/A]                      | [N/A]           | [24/7 -- Premier/Unified] |
-| Azure Support Ticket Portal  | [N/A]             | [N/A]                | [https://portal.azure.com] | [N/A]           | [24/7]                 |
+| Role                        | Name              | Email                                  | Availability           |
+|-----------------------------|-------------------|----------------------------------------|------------------------|
+| Support Contact             | IntelliSec Solutions | support@intellisecsolutions.com     | Business hours         |
+| Azure Support               | N/A               | https://portal.azure.com               | Per Azure support plan |
+
+> **Status:** Formal on-call rotation and emergency contacts are NOT IMPLEMENTED. No PagerDuty, OpsGenie, or similar on-call management tool is in use.
+
+### Planned Improvements
+
+- Establish an on-call rotation
+- Define formal escalation paths with response time SLAs
+- Set up alerting integration with an on-call management tool
 
 ---
 
 ## 8. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |

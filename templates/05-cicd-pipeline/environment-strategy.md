@@ -2,21 +2,19 @@
 
 | **Page Title**   | Environment Strategy                       |
 |------------------|--------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                               |
-| **Status**       | [Draft / In Review / Approved / Deprecated] |
-| **Owner**        | [TEAM OR INDIVIDUAL NAME]                  |
+| **Last Updated** | 2026-02-14                                 |
+| **Status**       | In Review                                  |
+| **Owner**        | IntelliSecOps DevOps Team                  |
 
 ---
 
 ## 1. Environment Inventory
 
-| Environment        | Purpose                                 | Azure Subscription          | Resource Group          | URL                      | Access Level               | Data Type                 |
-|--------------------|-----------------------------------------|-----------------------------|-------------------------|--------------------------|----------------------------|---------------------------|
-| **Dev**            | Active development and debugging        | [DEV-SUBSCRIPTION-NAME/ID]  | [DEV-RG]                | [DEV-URL]                | All developers             | Synthetic / seed data     |
-| **QA / Test**      | Functional and integration testing      | [QA-SUBSCRIPTION-NAME/ID]   | [QA-RG]                 | [QA-URL]                 | QA team + developers       | Synthetic test data       |
-| **Staging / Pre-Prod** | Pre-production validation, UAT      | [STG-SUBSCRIPTION-NAME/ID]  | [STG-RG]                | [STG-URL]                | QA + product owners + ops  | Anonymized production data|
-| **Production**     | Live customer-facing environment        | [PRD-SUBSCRIPTION-NAME/ID]  | [PRD-RG]                | [PRD-URL]                | Operations team only       | Real customer data        |
-| **Ephemeral (PR)** | Per-pull-request preview environments   | [DEV-SUBSCRIPTION-NAME/ID]  | [EPHEMERAL-RG]          | Auto-generated           | PR author + reviewers      | Minimal seed data         |
+| Environment        | Purpose                                 | Azure Subscription          | Resource Group               | URL                              | Access Level               | Data Type                 |
+|--------------------|-----------------------------------------|-----------------------------|------------------------------|----------------------------------|----------------------------|---------------------------|
+| **Development**    | Active development and local debugging  | N/A (local Docker Compose)  | N/A                          | http://localhost:5173 (frontend), http://localhost:3001 (backend) | All developers | Synthetic / seed data (local PostgreSQL) |
+| **Production**     | Live customer-facing environment        | CMMC Assessor Subscription  | `rg-cmmc-assessor-prod`     | https://cmmc.intellisecops.com (frontend), https://api.cmmc.intellisecops.com (backend) | Operations team + authorized users | Real customer data |
+| **Staging**        | Pre-production validation (PLANNED)     | Not yet provisioned         | Planned: `rg-cmmc-assessor-stg` | Not yet configured           | Planned: QA + product owners | Planned: Anonymized data  |
 
 ---
 
@@ -24,19 +22,23 @@
 
 This matrix documents intentional differences between environments. The goal is to keep environments as similar as possible while managing cost and data sensitivity.
 
-| Dimension                 | Dev                         | QA / Test                   | Staging / Pre-Prod          | Production                  |
-|---------------------------|-----------------------------|-----------------------------|-----------------------------|------------------------------|
-| **AKS Node Count**        | [NUMBER]                    | [NUMBER]                    | [NUMBER]                    | [NUMBER]                     |
-| **AKS Node SKU**          | [SKU: e.g., Standard_B2s]  | [SKU]                       | [SKU: same as prod]         | [SKU: e.g., Standard_D4s_v5] |
-| **App Service Plan SKU**  | [SKU: e.g., B1]            | [SKU: e.g., S1]            | [SKU: same as prod]         | [SKU: e.g., P2v3]           |
-| **SQL Database Tier**     | [TIER: e.g., Basic]        | [TIER: e.g., S1]           | [TIER: same as prod]        | [TIER: e.g., P2]            |
-| **Replicas / Instances**  | 1                           | 1-2                         | [SAME AS PROD or reduced]   | [NUMBER]                     |
-| **Feature Flags**         | All enabled                 | Per test plan               | Mirror production            | Controlled rollout           |
-| **SSL/TLS**               | Self-signed / Let's Encrypt | Let's Encrypt               | Org CA cert                  | Org CA cert (production)     |
-| **Custom Domain**         | No                          | No                          | [STG-DOMAIN]                 | [PRD-DOMAIN]                 |
-| **Monitoring Level**      | Basic (logs + metrics)      | Basic                       | Full (same as prod)          | Full (APM, alerts, dashboards)|
-| **Auto-scaling**          | Disabled                    | Disabled                    | Enabled (conservative)       | Enabled (production rules)   |
-| **Backup / DR**           | None                        | None                        | Daily backups                | [BACKUP-SCHEDULE] + geo-DR   |
+| Dimension                 | Development (Local)               | Staging (Planned)                 | Production                        |
+|---------------------------|-----------------------------------|-----------------------------------|-----------------------------------|
+| **Compute Platform**      | Docker Compose                    | Azure Container Apps (planned)    | Azure Container Apps              |
+| **Backend Container**     | Node.js (hot-reload)              | Container image from ACR (planned)| Container image from ACR          |
+| **Backend Resources**     | Unlimited (local)                 | 0.5 CPU, 1Gi (planned, same as prod) | 0.5 CPU, 1Gi                 |
+| **Frontend Container**    | Vite dev server                   | Nginx (planned, same as prod)     | Nginx serving Vite build          |
+| **Frontend Resources**    | Unlimited (local)                 | 0.25 CPU, 0.5Gi (planned, same as prod) | 0.25 CPU, 0.5Gi           |
+| **Database**              | PostgreSQL 16 Alpine (Docker)     | PostgreSQL Flexible Server (planned) | PostgreSQL Flexible Server (B1ms, 32GB) |
+| **Replicas**              | 1 per service                     | 0-3 (planned, same as prod)      | 0-3 (HTTP concurrency scaling)    |
+| **SSL/TLS**               | None (HTTP localhost)             | Let's Encrypt or Azure managed (planned) | Azure managed (custom domain) |
+| **Custom Domain**         | No (`localhost`)                  | Planned (e.g., `staging.cmmc.intellisecops.com`) | `cmmc.intellisecops.com` / `api.cmmc.intellisecops.com` |
+| **Monitoring**            | Local logs only                   | Planned: Log Analytics            | Log Analytics workspace           |
+| **Auto-scaling**          | N/A                               | Planned: 0-3 replicas            | 0-3 replicas, HTTP concurrency    |
+| **Backup / DR**           | None                              | Planned: Daily backups            | Managed by Azure PostgreSQL       |
+| **Key Vault**             | N/A (env vars in docker-compose)  | Planned                           | Azure Key Vault                   |
+| **Container Registry**    | Local builds                      | `acrcmmcassessorprod` (shared, planned) | `acrcmmcassessorprod`       |
+| **Additional Services**   | Adminer (DB admin GUI)            | None planned                      | None                              |
 
 ---
 
@@ -44,18 +46,16 @@ This matrix documents intentional differences between environments. The goal is 
 
 | Environment        | Data Source                           | Data Volume      | PII Present | Refresh Frequency       | Management Approach                            |
 |--------------------|---------------------------------------|------------------|-------------|-------------------------|------------------------------------------------|
-| **Dev**            | Seed scripts / synthetic generators   | Minimal          | No          | On-demand               | Developers run seed scripts locally or in CI   |
-| **QA / Test**      | Synthetic test data suite             | Moderate         | No          | Before each test cycle  | Automated data setup/teardown in test framework|
-| **Staging**        | Anonymized production snapshot        | Production-like  | No (masked) | [FREQUENCY: e.g., weekly] | Automated anonymization pipeline             |
-| **Production**     | Real customer data                    | Full             | Yes         | N/A (live)              | Subject to data governance and compliance      |
-| **Ephemeral (PR)** | Minimal seed data                     | Minimal          | No          | Per PR creation         | Provisioned and destroyed with PR lifecycle    |
+| **Development**    | Prisma seed scripts / manual data     | Minimal          | No          | On-demand               | Developers run `npx prisma db seed` locally    |
+| **Staging**        | Anonymized production snapshot (planned) | Production-like (planned) | No (planned) | Planned: weekly  | Planned: Automated anonymization pipeline      |
+| **Production**     | Real customer/assessment data         | Full             | Yes         | N/A (live)              | Subject to CMMC compliance and data governance |
 
 ### Data Anonymization Pipeline
 
-- **Tool:** [TOOL-NAME: e.g., Azure Data Factory, custom script, Delphix]
-- **Schedule:** [SCHEDULE]
-- **Anonymization rules:** [LINK TO DATA MASKING RULES DOCUMENT]
-- **Validation:** Post-anonymization checks confirm no PII remains
+- **Tool:** Not yet implemented
+- **Schedule:** Planned for when staging environment is provisioned
+- **Anonymization rules:** To be defined (must comply with CMMC data handling requirements)
+- **Validation:** Post-anonymization checks to confirm no PII remains
 
 ---
 
@@ -63,61 +63,82 @@ This matrix documents intentional differences between environments. The goal is 
 
 ### IaC Tooling
 
-| Component                | Tool                                | Repository                        | State Storage                       |
-|--------------------------|-------------------------------------|-----------------------------------|--------------------------------------|
-| Azure infrastructure     | [Terraform / Bicep]                 | [ORG/INFRA-REPO]                  | [Azure Storage Account / Terraform Cloud] |
-| Kubernetes manifests     | [Helm / Kustomize]                  | [ORG/K8S-REPO or same repo]      | Git (GitOps)                         |
-| Database migrations      | [TOOL: e.g., Flyway, EF Migrations]| [ORG/APP-REPO]                    | N/A (applied at deploy time)         |
+| Component                | Tool                   | Repository / Location              | State Storage                       |
+|--------------------------|------------------------|------------------------------------|--------------------------------------|
+| Azure infrastructure     | Bicep                  | `infra/main.bicep` (mono-repo)    | N/A (Bicep is declarative; Azure Resource Manager handles state) |
+| Container configuration  | Docker / Docker Compose| `docker-compose.yml`, `Dockerfile` files in backend/ and frontend/ | Git |
+| Database schema          | Prisma Migrations      | `backend/prisma/`                  | N/A (applied at deploy time)         |
+
+### IaC Resources Defined in `main.bicep`
+
+| Resource                        | Azure Resource Type                    | Notes                                    |
+|---------------------------------|----------------------------------------|------------------------------------------|
+| Log Analytics Workspace         | `Microsoft.OperationalInsights/workspaces` | Centralized logging                  |
+| Container Registry              | `Microsoft.ContainerRegistry/registries` | `acrcmmcassessorprod`                 |
+| Container Apps Environment      | `Microsoft.App/managedEnvironments`    | `cae-cmmc-assessor-prod`                |
+| PostgreSQL Flexible Server      | `Microsoft.DBforPostgreSQL/flexibleServers` | B1ms SKU, 32GB storage              |
+| Storage Account                 | `Microsoft.Storage/storageAccounts`    | General purpose storage                  |
+| Key Vault                       | `Microsoft.KeyVault/vaults`            | Secrets management                       |
+| Backend Container App           | `Microsoft.App/containerApps`          | `cmmc-api` (port 3001)                  |
+| Frontend Container App          | `Microsoft.App/containerApps`          | `cmmc-web` (port 80)                    |
+
+### Bicep Parameters
+
+| Parameter          | Description                                     |
+|--------------------|-------------------------------------------------|
+| `environment`      | Environment name (e.g., `prod`)                 |
+| `location`         | Azure region (Canada Central)                   |
+| `baseName`         | Base name for resource naming                   |
+| `dbAdminPassword`  | PostgreSQL admin password (secure)              |
+| `jwtSecret`        | JWT signing secret (secure)                     |
+| `entraClientId`    | Microsoft Entra ID client ID                    |
+| `entraClientSecret`| Microsoft Entra ID client secret (secure)       |
+| `customDomain`     | Custom domain for frontend                      |
+| `apiDomain`        | Custom domain for backend API                   |
 
 ### Provisioning Workflow
 
-1. Developer submits a PR modifying IaC files.
-2. GitHub Actions runs `terraform plan` / `bicep what-if` and posts the plan as a PR comment.
-3. Reviewer approves the PR after inspecting the plan.
-4. On merge to `main`, GitHub Actions runs `terraform apply` / `az deployment group create` for the target environment.
-5. Post-apply smoke tests validate infrastructure health.
+1. Operator triggers the Infrastructure workflow manually via `workflow_dispatch`.
+2. Selects action: `plan` (what-if preview) or `deploy` (actual deployment).
+3. GitHub Actions authenticates to Azure via OIDC.
+4. **If plan:** Runs `az deployment group what-if` and outputs the result summary.
+5. **If deploy:** Creates the resource group (if needed) and runs `az deployment group create` using `infra/main.bicep` with `parameters.prod.json`.
+6. Output summary is written to `GITHUB_STEP_SUMMARY`.
 
-### GitHub Actions IaC Workflow Triggers
+### GitHub Actions Infrastructure Workflow Triggers
 
-| Action              | Trigger                           | Workflow File                          |
-|---------------------|-----------------------------------|----------------------------------------|
-| Plan (preview)      | `pull_request` on IaC paths      | `.github/workflows/infra-plan.yml`     |
-| Apply (provision)   | `push` to `main` on IaC paths    | `.github/workflows/infra-apply.yml`    |
-| Destroy (teardown)  | Manual `workflow_dispatch`        | `.github/workflows/infra-destroy.yml`  |
+| Action              | Trigger                           | Workflow File                                |
+|---------------------|-----------------------------------|----------------------------------------------|
+| Plan (what-if)      | Manual `workflow_dispatch` (action: plan)   | `.github/workflows/infrastructure.yml` |
+| Deploy (provision)  | Manual `workflow_dispatch` (action: deploy) | `.github/workflows/infrastructure.yml` |
 
 ---
 
 ## 5. Ephemeral PR Environments
 
-Ephemeral environments are created automatically for each pull request to enable isolated testing and review.
+Ephemeral PR environments are **not yet implemented**.
+
+### Planned Configuration
 
 | Configuration Item        | Value                                  |
 |---------------------------|----------------------------------------|
-| **Trigger**               | PR opened or updated                   |
-| **Namespace/Slot**        | `pr-[PR-NUMBER]`                       |
-| **Infrastructure**        | Shared AKS cluster, dedicated namespace / shared App Service, new deployment slot |
-| **URL Pattern**           | `https://pr-[PR-NUMBER].[BASE-DOMAIN]` |
-| **Data**                  | Minimal seed data via init container/script |
+| **Trigger**               | PR opened or updated (planned)         |
+| **Infrastructure**        | Azure Container Apps revision (planned)|
+| **URL Pattern**           | `https://pr-[PR-NUMBER].cmmc.intellisecops.com` (planned) |
+| **Data**                  | Minimal seed data (planned)            |
 | **TTL**                   | Destroyed when PR is closed or merged  |
-| **Cost Limit**            | [MONTHLY-BUDGET] per PR environment    |
-
-### Cleanup Automation
-
-- A scheduled GitHub Actions workflow runs [FREQUENCY] to identify and destroy orphaned PR environments.
-- Environments older than [MAX-AGE-HOURS] hours with no matching open PR are automatically torn down.
+| **Priority**              | Low (nice-to-have after staging is set up) |
 
 ---
 
 ## 6. Environment Lifecycle
 
-| Phase              | Dev                        | QA / Test                  | Staging                    | Production                 |
-|--------------------|----------------------------|----------------------------|----------------------------|----------------------------|
-| **Creation**       | Always running             | Always running             | Always running             | Always running             |
-| **Updates**        | Continuous (auto-deploy)   | On test cycle start        | Pre-release                | Release schedule           |
-| **Data Reset**     | On-demand                  | Before each test cycle     | [FREQUENCY]                | N/A                        |
-| **Teardown**       | Never (persistent)         | Never (persistent)         | Never (persistent)         | Never (persistent)         |
-
-> **Exception:** Ephemeral PR environments follow a create-on-PR-open / destroy-on-PR-close lifecycle.
+| Phase              | Development (Local)            | Staging (Planned)              | Production                     |
+|--------------------|--------------------------------|--------------------------------|--------------------------------|
+| **Creation**       | `docker-compose up`            | Planned: IaC deployment        | IaC deployment (Bicep)         |
+| **Updates**        | Live reload on code changes    | Planned: CD after staging gate | CD auto-deploys on push to `main` |
+| **Data Reset**     | `npx prisma db push` / seed   | Planned: Before each UAT cycle | N/A                            |
+| **Teardown**       | `docker-compose down`          | Planned: Persistent            | Never (persistent)             |
 
 ---
 
@@ -125,49 +146,36 @@ Ephemeral environments are created automatically for each pull request to enable
 
 | Environment        | Monthly Budget (est.)   | Cost Optimization Measures                                      | Alert Threshold       |
 |--------------------|-------------------------|-----------------------------------------------------------------|-----------------------|
-| **Dev**            | $[AMOUNT]               | B-series VMs; scale to zero outside business hours              | [PERCENTAGE]% of budget |
-| **QA / Test**      | $[AMOUNT]               | Spot instances for AKS; paused outside test cycles              | [PERCENTAGE]% of budget |
-| **Staging**        | $[AMOUNT]               | Same SKUs as production but fewer replicas; scheduled scale-down | [PERCENTAGE]% of budget |
-| **Production**     | $[AMOUNT]               | Reserved instances; auto-scaling; right-sizing reviews          | [PERCENTAGE]% of budget |
-| **Ephemeral (PR)** | $[AMOUNT] per PR        | Auto-destroy on PR close; minimal SKUs                          | [AMOUNT] per PR        |
+| **Development**    | $0                      | Runs locally on developer machines (Docker)                     | N/A                   |
+| **Production**     | Estimated ~$150-300/mo  | Minimum 0 replicas (scale to zero when idle); B1ms PostgreSQL tier; small Container App SKUs | 80% of budget |
+| **Staging**        | Estimated ~$100-200/mo (planned) | Planned: Same scale-to-zero; B1ms PostgreSQL; schedule scale-down | Planned        |
 
 ### Cost Optimization Checklist
 
-- [ ] Azure Advisor recommendations reviewed monthly
-- [ ] Dev/QA environments scaled down or stopped outside business hours via Azure Automation / GitHub Actions schedule
-- [ ] Reserved Instances or Savings Plans purchased for production workloads
-- [ ] Unused resources identified and removed (orphaned disks, IPs, etc.)
-- [ ] Cost alerts configured in Azure Cost Management for each resource group
-- [ ] Ephemeral environments have a hard TTL with automated cleanup
+- [x] Production Container Apps configured with minimum 0 replicas (scale to zero)
+- [x] PostgreSQL Flexible Server uses B1ms (burstable) tier
+- [x] Container Apps use minimal CPU/memory allocations (0.25-0.5 CPU)
+- [ ] Azure Advisor recommendations reviewed monthly (planned)
+- [ ] Cost alerts configured in Azure Cost Management (planned)
+- [ ] Staging environment scaled down outside business hours (planned)
 
 ---
 
 ## 8. Access Control per Environment
 
-| Environment        | Developer Access           | QA Access                  | Operations Access          | Business Stakeholder Access |
-|--------------------|----------------------------|----------------------------|----------------------------|-----------------------------|
-| **Dev**            | Full (deploy + debug)      | Read-only                  | Full                       | None                        |
-| **QA / Test**      | Read-only (logs, metrics)  | Full (deploy + test)       | Full                       | None                        |
-| **Staging**        | Read-only                  | Full (test execution)      | Full (deploy + manage)     | Read-only (UAT)             |
-| **Production**     | None (emergency only via PIM) | None                    | Full (via PIM/JIT)         | Read-only (dashboards)      |
+| Environment        | Developer Access           | Operations Access          | Business Stakeholder Access |
+|--------------------|----------------------------|----------------------------|-----------------------------|
+| **Development**    | Full (local machine)       | N/A                        | None                        |
+| **Production**     | Read-only (Azure Portal, logs) | Full (via Azure RBAC)  | Application access only (via CMMC platform) |
+| **Staging**        | Planned: Read-only         | Planned: Full              | Planned: UAT access         |
 
-### Azure RBAC Roles
+### Azure RBAC Roles (Production)
 
-| Role                            | Assigned To             | Environments              | Azure Role                              |
-|---------------------------------|-------------------------|---------------------------|-----------------------------------------|
-| Infrastructure Admin            | [TEAM/GROUP]            | All                       | Owner                                   |
-| Application Deployer            | GitHub Actions (OIDC)   | All                       | Contributor (scoped to RG)              |
-| Developer                       | [AD-GROUP]              | Dev, QA                   | Reader + Log Analytics Reader           |
-| QA Engineer                     | [AD-GROUP]              | QA, Staging               | Reader + App Service Contributor        |
-| Operations                      | [AD-GROUP]              | Staging, Production       | Contributor (via PIM activation)        |
-| Business Stakeholder            | [AD-GROUP]              | Staging                   | Reader                                  |
-
-### Privileged Identity Management (PIM)
-
-- Production access requires **Azure AD PIM activation** with justification.
-- Maximum activation duration: [HOURS] hours.
-- Approver: [APPROVER-ROLE/NAME].
-- All PIM activations are logged and audited.
+| Role                            | Assigned To             | Azure Role                              |
+|---------------------------------|-------------------------|-----------------------------------------|
+| Application Deployer            | GitHub Actions (OIDC)   | Contributor (scoped to `rg-cmmc-assessor-prod`) |
+| Infrastructure Admin            | DevOps Team             | Owner (scoped to subscription)          |
+| Operations                      | Operations Team         | Contributor (scoped to `rg-cmmc-assessor-prod`) |
 
 ---
 
@@ -175,12 +183,20 @@ Ephemeral environments are created automatically for each pull request to enable
 
 ### Environment URLs Quick Reference
 
-| Environment   | Application URL           | Azure Portal (Resource Group)                                                 |
-|---------------|---------------------------|-------------------------------------------------------------------------------|
-| Dev           | [DEV-URL]                 | `https://portal.azure.com/#@[TENANT]/resource/subscriptions/[SUB-ID]/resourceGroups/[DEV-RG]` |
-| QA            | [QA-URL]                  | `https://portal.azure.com/#@[TENANT]/resource/subscriptions/[SUB-ID]/resourceGroups/[QA-RG]`  |
-| Staging       | [STG-URL]                 | `https://portal.azure.com/#@[TENANT]/resource/subscriptions/[SUB-ID]/resourceGroups/[STG-RG]` |
-| Production    | [PRD-URL]                 | `https://portal.azure.com/#@[TENANT]/resource/subscriptions/[SUB-ID]/resourceGroups/[PRD-RG]` |
+| Environment   | Frontend URL                        | Backend URL                              | Azure Resource Group            |
+|---------------|-------------------------------------|------------------------------------------|---------------------------------|
+| Development   | http://localhost:5173               | http://localhost:3001                     | N/A (local Docker Compose)      |
+| Production    | https://cmmc.intellisecops.com      | https://api.cmmc.intellisecops.com       | `rg-cmmc-assessor-prod` (Canada Central) |
+| Staging       | Not yet configured                  | Not yet configured                       | Planned: `rg-cmmc-assessor-stg` |
+
+### Docker Compose Services (Development)
+
+| Service    | Image                  | Port Mapping   | Purpose                              |
+|------------|------------------------|----------------|--------------------------------------|
+| postgres   | `postgres:16-alpine`   | 5432:5432      | Local PostgreSQL database            |
+| backend    | Built from `./backend` | 3001:3001      | Express.js API server                |
+| frontend   | Built from `./frontend`| 5173:5173      | Vite dev server for React SPA        |
+| adminer    | `adminer`              | 8080:8080      | Database administration GUI          |
 
 ### Related Pages
 

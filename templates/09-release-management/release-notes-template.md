@@ -3,9 +3,9 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Release Notes -- [VERSION NUMBER]  |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Published]    |
-| Owner            | [RELEASE MANAGER NAME]             |
+| Last Updated     | 2026-02-14                         |
+| Status           | Template                           |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
@@ -13,34 +13,34 @@
 
 | Attribute                | Value                                              |
 |--------------------------|----------------------------------------------------|
-| Version                  | [e.g., v2.4.0]                                     |
+| Version                  | [e.g., v1.2.0]                                     |
 | Release Date             | [YYYY-MM-DD]                                       |
 | Release Time (UTC)       | [HH:MM UTC]                                        |
 | Release Manager          | [NAME]                                             |
-| Deployment Environment   | [Production / Staging / All]                       |
-| Deployment Method        | [GitHub Actions automated / Manual]                |
-| Deployment Duration      | [XX minutes]                                       |
-| Deployment Ticket        | [JIRA-XXXX / ADO-XXXX]                            |
-| Previous Version         | [e.g., v2.3.1]                                     |
-| Git Tag                  | [e.g., v2.4.0]                                     |
-| Git Commit SHA           | [FULL SHA]                                         |
+| Deployment Environment   | Production (only environment)                      |
+| Deployment Method        | GitHub Actions CD -- auto-deploy on push to main   |
+| Deployment Duration      | ~5-10 minutes (container build + deploy)           |
+| Previous Version         | [e.g., v1.1.0]                                     |
+| Git Tag                  | [e.g., v1.2.0] (if tagged)                         |
+| Git Commit SHA           | [FULL SHA from main branch]                        |
+
+> **Note:** Releases are triggered automatically by pushing to the main branch. There is no formal release versioning or tagging process. Versions are tracked by container image tags in ACR (acrcmmcassessorprod).
 
 ---
 
 ## 2. Summary of Changes
 
-[WRITE 2-3 SENTENCES summarizing the overall theme of this release. For example: "This release introduces the new checkout experience, improves API response times by 30%, and addresses several security vulnerabilities identified in the Q4 audit."]
+[WRITE 2-3 SENTENCES summarizing the overall theme of this release. For example: "This release adds assessment export functionality, fixes a bug in the scoring calculation, and updates several dependencies for security patches."]
 
 ---
 
 ## 3. New Features
 
-| Feature                          | Description                                                    | Jira / Issue Link  | Documentation Link       | Feature Flag (if applicable) |
-|----------------------------------|----------------------------------------------------------------|--------------------|--------------------------|------------------------------|
-| [New Checkout Experience]        | [Redesigned checkout flow with Apple Pay and Google Pay support]| [JIRA-1234]        | [LINK TO USER DOCS]      | [Feature.NewCheckout]        |
-| [Dark Mode Support]              | [User-selectable dark mode for the web application]            | [JIRA-1250]        | [LINK TO USER DOCS]      | [Feature.DarkMode]           |
-| [Bulk Export API]                | [New API endpoint for bulk data export in CSV and JSON formats]| [JIRA-1267]        | [LINK TO API DOCS]       | [N/A]                        |
-| [FEATURE NAME]                   | [DESCRIPTION]                                                  | [ISSUE LINK]       | [DOC LINK]               | [FLAG NAME / N/A]            |
+| Feature                          | Description                                                    | Issue Link         | Feature Flag (if applicable) |
+|----------------------------------|----------------------------------------------------------------|--------------------|------------------------------|
+| [Feature Name]                   | [Description of the feature]                                   | [GitHub Issue #]   | N/A (no feature flags)       |
+
+> **Note:** Feature flags are NOT IMPLEMENTED. All features are deployed directly to production when merged to main.
 
 ---
 
@@ -48,10 +48,7 @@
 
 | Bug ID       | Description                                              | Severity   | Root Cause                                    | Affected Since |
 |--------------|----------------------------------------------------------|------------|-----------------------------------------------|----------------|
-| [JIRA-1301]  | [Login page intermittently returns 500 error]            | [Critical] | [Race condition in session token validation]  | [v2.3.0]       |
-| [JIRA-1305]  | [PDF export shows incorrect date format for EU users]    | [Major]    | [Locale not passed to date formatter]         | [v2.2.0]       |
-| [JIRA-1312]  | [Search results pagination missing last page link]       | [Minor]    | [Off-by-one error in pagination calculation]  | [v2.3.1]       |
-| [BUG ID]     | [DESCRIPTION]                                            | [SEVERITY] | [ROOT CAUSE]                                  | [VERSION]      |
+| [Issue #]    | [Description of the bug fix]                             | [Severity] | [Root cause description]                      | [Version]      |
 
 ---
 
@@ -59,9 +56,10 @@
 
 | Issue                                        | Workaround                                      | Target Fix Version | Issue Link   |
 |----------------------------------------------|-------------------------------------------------|--------------------|--------------|
-| [Bulk export may time out for datasets >1M rows] | [Use date-range filters to reduce dataset size] | [v2.5.0]          | [JIRA-1320]  |
-| [Dark mode does not apply to email templates]| [No workaround; emails remain in light mode]     | [v2.5.0]           | [JIRA-1322]  |
-| [ISSUE DESCRIPTION]                          | [WORKAROUND]                                    | [VERSION]          | [LINK]       |
+| Health endpoint leaks config info (F-38)     | No user impact; internal endpoint only           | TBD                | F-38         |
+| CORS allows localhost in production (F-40)   | No user impact; security hardening planned       | TBD                | F-40         |
+| Cold starts due to scale-to-zero             | Wait 30-60s; set min-replicas=1 if needed       | N/A (by design)    | N/A          |
+| [Issue Description]                          | [Workaround]                                    | [Version]          | [Link]       |
 
 ---
 
@@ -76,17 +74,7 @@
 
 | Change                                  | Impact                                              | Migration Required | Migration Guide                |
 |-----------------------------------------|-----------------------------------------------------|--------------------|--------------------------------|
-| [Removed `/api/v1/users` endpoint]      | [Clients using v1 users API must migrate to v2]     | [Yes]              | [LINK TO MIGRATION GUIDE]      |
-| [Changed auth token format from JWT HS256 to RS256] | [Clients must update token validation logic] | [Yes]            | [LINK TO MIGRATION GUIDE]      |
-| [CHANGE DESCRIPTION]                    | [IMPACT]                                            | [YES/NO]           | [LINK]                         |
-
-### Migration Steps (if applicable)
-
-1. [STEP 1: Update client SDK to version X.X]
-2. [STEP 2: Update API endpoint URLs from v1 to v2]
-3. [STEP 3: Update token validation configuration]
-4. [STEP 4: Test in staging before production cutover]
-5. [STEP 5: Deprecated endpoints will be removed in version X.X on YYYY-MM-DD]
+| [Change Description]                    | [Impact Description]                                | [Yes/No]           | [Link or instructions]         |
 
 ---
 
@@ -94,10 +82,9 @@
 
 | Configuration Item                   | Change                                       | Environment    | Action Required By     |
 |--------------------------------------|----------------------------------------------|----------------|------------------------|
-| [App Setting: NEW_CHECKOUT_ENABLED]  | [Add new setting, value: true]               | [All]          | [DevOps]               |
-| [Key Vault: api-signing-key]         | [New RS256 signing key added]                | [All]          | [Security / DevOps]    |
-| [App Config: BulkExport.MaxRows]     | [New setting, value: 1000000]                | [All]          | [DevOps]               |
-| [CONFIGURATION ITEM]                 | [CHANGE]                                     | [ENVIRONMENT]  | [RESPONSIBLE]          |
+| [Key Vault secret / env variable]    | [Description of change]                      | Production     | [DevOps / Engineer]    |
+
+> **Note:** Configuration is managed through Key Vault secrets (kv-cmmc-assessor-prod) and Container App environment variables defined in Bicep. Changes to secrets require manual Key Vault updates. Changes to environment variables require Bicep parameter updates and redeployment.
 
 ---
 
@@ -105,19 +92,16 @@
 
 | Migration ID          | Description                                         | Reversible | Estimated Duration | Downtime Required |
 |-----------------------|-----------------------------------------------------|------------|--------------------|--------------------|
-| [20240215_001]        | [Add `payment_method` column to `orders` table]     | [Yes]      | [<1 minute]        | [No]               |
-| [20240215_002]        | [Create `bulk_exports` table]                       | [Yes]      | [<1 minute]        | [No]               |
-| [20240215_003]        | [Backfill `payment_method` for existing orders]     | [Yes]      | [~5 minutes]       | [No]               |
-| [MIGRATION ID]        | [DESCRIPTION]                                       | [YES/NO]   | [DURATION]         | [YES/NO]           |
+| [Prisma migration ID] | [Description of schema change]                      | [Yes/No]   | [Duration]         | No (online migration) |
 
 ### Migration Execution
 
 | Step | Action                                                  | Verified By |
 |------|---------------------------------------------------------|-------------|
-| 1    | Migrations tested in staging environment                | [NAME]      |
-| 2    | Database backup taken before production migration       | [NAME]      |
-| 3    | Migrations applied as part of deployment pipeline       | [Automated] |
-| 4    | Post-migration data integrity check completed           | [NAME]      |
+| 1    | Prisma migration runs automatically on container startup (`prisma migrate deploy`) | Automated |
+| 2    | Migration status verified via application health check  | Automated   |
+
+> **Note:** Database migrations are executed via Prisma migrate deploy, which runs during container startup. There is no separate migration step or pre-deployment migration validation. Migrations are tested locally before merging to main.
 
 ---
 
@@ -125,23 +109,17 @@
 
 | Dependency                      | Previous Version | New Version | Reason for Update                        | Security-Related |
 |---------------------------------|------------------|-------------|------------------------------------------|------------------|
-| [Microsoft.AspNetCore]          | [8.0.1]          | [8.0.3]     | [Security patch CVE-YYYY-XXXXX]          | [Yes]            |
-| [Newtonsoft.Json]               | [13.0.2]         | [13.0.3]    | [Bug fix for deserialization edge case]  | [No]             |
-| [Azure.Identity]                | [1.10.3]         | [1.10.4]    | [Managed identity improvements]          | [No]             |
-| [Helm chart: nginx-ingress]     | [4.8.3]          | [4.9.0]     | [Security patch, new features]           | [Yes]            |
-| [DEPENDENCY]                    | [OLD VERSION]    | [NEW VERSION]| [REASON]                                | [YES/NO]         |
+| [Package name]                  | [Old version]    | [New version] | [Reason]                               | [Yes/No]         |
 
 ---
 
 ## 10. Performance Impact Notes
 
-| Area                      | Expected Impact                                      | Measurement                          | Baseline        | Post-Release Target |
-|---------------------------|------------------------------------------------------|--------------------------------------|-----------------|---------------------|
-| [API Response Time (P95)]  | [Improved by ~30% due to query optimization]        | [Application Insights: requests P95] | [450ms]         | [<320ms]            |
-| [Memory Usage (AKS pods)] | [Increased by ~15% due to new caching layer]         | [Azure Monitor: container memory]    | [512MB avg]     | [~590MB avg]        |
-| [Database DTU Usage]       | [No significant change expected]                    | [Azure Monitor: SQL DTU %]           | [45% avg]       | [~45% avg]          |
-| [Page Load Time]           | [Improved for checkout flow, no change elsewhere]    | [Application Insights: page views]   | [2.1s avg]      | [<1.5s checkout]    |
-| [AREA]                     | [EXPECTED IMPACT]                                   | [MEASUREMENT]                        | [BASELINE]      | [TARGET]            |
+| Area                      | Expected Impact                                      | Measurement                          |
+|---------------------------|------------------------------------------------------|--------------------------------------|
+| [Area]                    | [Expected impact description]                        | Check Container App metrics in Azure Monitor |
+
+> **Note:** No Application Insights or APM is deployed. Performance impact assessment is limited to Azure Monitor platform metrics (CPU, memory) and manual testing.
 
 ---
 
@@ -149,12 +127,12 @@
 
 | Attribute                | Value                                                |
 |--------------------------|------------------------------------------------------|
-| Rollback Possible        | [Yes / Partial -- see notes]                         |
-| Rollback Method          | [Slot swap / Helm rollback / Redeploy v2.3.1]        |
-| Rollback Time Estimate   | [XX minutes]                                         |
-| Rollback Decision Deadline | [Within 2 hours post-deployment]                   |
-| Rollback Owner           | [RELEASE MANAGER / ON-CALL SRE]                     |
-| Database Rollback Notes  | [All migrations are reversible. Run down migrations before app rollback.] |
+| Rollback Possible        | Yes                                                  |
+| Rollback Method          | Redeploy previous container image tag via `az containerapp update` or GitHub Actions workflow dispatch |
+| Rollback Time Estimate   | 5-10 minutes                                         |
+| Rollback Decision Deadline | Within 1 hour post-deployment                      |
+| Rollback Owner           | Deploying engineer                                   |
+| Database Rollback Notes  | Prisma migrations may not be easily reversible. If migration is non-reversible, must roll forward. |
 
 See [Rollback Procedures](../09-release-management/rollback-procedures.md) for detailed instructions.
 
@@ -164,17 +142,20 @@ See [Rollback Procedures](../09-release-management/rollback-procedures.md) for d
 
 | Role                    | Name            | Approval Status   | Date           | Notes                |
 |-------------------------|-----------------|-------------------|----------------|----------------------|
-| Release Manager         | [NAME]          | [Approved]        | [YYYY-MM-DD]   |                      |
-| Engineering Lead        | [NAME]          | [Approved]        | [YYYY-MM-DD]   |                      |
-| QA Lead                 | [NAME]          | [Approved]        | [YYYY-MM-DD]   |                      |
-| Product Owner           | [NAME]          | [Approved]        | [YYYY-MM-DD]   |                      |
-| Security (if required)  | [NAME]          | [Approved / N/A]  | [YYYY-MM-DD]   |                      |
+| Deploying Engineer      | [NAME]          | [Approved]        | [YYYY-MM-DD]   |                      |
+
+> **Note:** No formal multi-person approval process exists. Deployments are triggered automatically on push to main after PR review. There is no separate QA sign-off, security review, or release manager approval gate.
+
+### Planned Improvements
+
+- Implement approval gates for production deployments
+- Add QA sign-off requirement for releases with new features
+- Define a release manager role
 
 ---
 
 ## 13. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial release notes created]           |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial release notes template created    |

@@ -3,15 +3,15 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Azure Infrastructure Overview      |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Approved]     |
-| Owner            | [TEAM OR INDIVIDUAL NAME]          |
+| Last Updated     | 2026-02-14                         |
+| Status           | Draft                              |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document provides a comprehensive overview of the Azure infrastructure underpinning the [PROJECT NAME] platform. It serves as the authoritative reference for subscription strategy, resource organization, regional deployment, service inventory, governance policies, and cost management.
+This document provides a comprehensive overview of the Azure infrastructure underpinning the CMMC Assessor Platform. It serves as the authoritative reference for subscription strategy, resource organization, regional deployment, service inventory, governance policies, and cost management.
 
 ---
 
@@ -21,31 +21,23 @@ This document provides a comprehensive overview of the Azure infrastructure unde
 
 | Attribute                | Value                                              |
 |--------------------------|----------------------------------------------------|
-| Model                    | [Single Subscription / Multi-Subscription]         |
-| Management Group Hierarchy | [MANAGEMENT GROUP STRUCTURE]                     |
-| Naming Convention        | [e.g., sub-{org}-{workload}-{environment}]         |
+| Model                    | Single Subscription                                |
+| Management Group Hierarchy | N/A -- single subscription, no management group hierarchy configured |
+| Naming Convention        | N/A -- single subscription used for all workloads  |
 
 ### 2.2 Subscription Inventory
 
 | Subscription Name          | Subscription ID                        | Purpose                  | Environment        | Monthly Budget |
 |----------------------------|----------------------------------------|--------------------------|---------------------|----------------|
-| [SUBSCRIPTION NAME]        | [xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx] | [Production workloads]   | [Production]        | [USD $X,XXX]   |
-| [SUBSCRIPTION NAME]        | [xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx] | [Non-production]         | [Dev / Staging]     | [USD $X,XXX]   |
-| [SUBSCRIPTION NAME]        | [xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx] | [Shared services / Hub]  | [All]               | [USD $X,XXX]   |
+| CMMC Assessor Production   | (Refer to Azure Portal)               | All workloads            | Production          | CAD ~$70       |
+
+> **Note:** Only a single subscription exists. There are no separate subscriptions for non-production or shared services. A staging/dev subscription is planned but NOT IMPLEMENTED.
 
 ### 2.3 Management Group Hierarchy
 
 ```
-Tenant Root Group
- +-- [ORG NAME]
-      +-- Platform
-      |    +-- Connectivity
-      |    +-- Identity
-      |    +-- Management
-      +-- Landing Zones
-      |    +-- Production
-      |    +-- Non-Production
-      +-- Sandbox
+N/A -- No management group hierarchy is configured.
+The project operates under a single subscription with a single resource group.
 ```
 
 ---
@@ -55,24 +47,22 @@ Tenant Root Group
 ### 3.1 Naming Convention
 
 ```
-rg-{workload}-{environment}-{region}-{instance}
+{type}-{baseName}-{env}
 ```
 
-| Token         | Description                        | Examples                        |
-|---------------|------------------------------------|---------------------------------|
-| `{workload}`  | Application or service name        | `app`, `data`, `infra`          |
-| `{environment}` | Deployment environment           | `dev`, `stg`, `prod`            |
-| `{region}`    | Azure region abbreviation          | `eus`, `wus`, `weu`             |
-| `{instance}`  | Optional numeric instance          | `001`, `002`                    |
+| Token           | Description                        | Examples                        |
+|-----------------|------------------------------------|---------------------------------|
+| `{type}`        | Azure resource type abbreviation   | `psql`, `kv`, `cae`, `log`     |
+| `{baseName}`    | Project name                       | `cmmc-assessor`                 |
+| `{env}`         | Deployment environment             | `prod`                          |
 
 ### 3.2 Resource Group Inventory
 
-| Resource Group Name             | Subscription         | Region         | Purpose                          | Owner            |
-|---------------------------------|----------------------|----------------|----------------------------------|------------------|
-| [rg-app-prod-eus-001]          | [Production]         | [East US]      | [Production application tier]    | [TEAM NAME]      |
-| [rg-data-prod-eus-001]         | [Production]         | [East US]      | [Production data tier]           | [TEAM NAME]      |
-| [rg-infra-prod-eus-001]        | [Production]         | [East US]      | [Shared infrastructure]          | [TEAM NAME]      |
-| [rg-app-dev-eus-001]           | [Non-Production]     | [East US]      | [Development environment]        | [TEAM NAME]      |
+| Resource Group Name             | Subscription         | Region           | Purpose                          | Owner                |
+|---------------------------------|----------------------|------------------|----------------------------------|----------------------|
+| rg-cmmc-assessor-prod           | CMMC Assessor Prod   | Canada Central   | All production resources         | IntelliSec Solutions |
+
+> **Note:** All resources are deployed to a single resource group. No separation between application, data, and infrastructure tiers.
 
 ---
 
@@ -80,36 +70,41 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Attribute                        | Value                                                    |
 |----------------------------------|----------------------------------------------------------|
-| Primary Region                   | [e.g., East US / eastus]                                 |
-| Secondary / DR Region            | [e.g., West US / westus]                                 |
-| Rationale for Primary            | [e.g., proximity to users, service availability, compliance] |
-| Rationale for Secondary          | [e.g., geographic separation, paired region benefits]    |
-| Data Residency Requirements      | [e.g., data must reside within the US]                   |
-| Region Pair                      | [e.g., East US <-> West US]                              |
+| Primary Region                   | Canada Central (canadacentral)                           |
+| Secondary / DR Region            | NOT IMPLEMENTED -- no DR region configured               |
+| Rationale for Primary            | Data residency requirements for Canadian clients, proximity to users |
+| Rationale for Secondary          | N/A                                                      |
+| Data Residency Requirements      | Data should reside within Canada                         |
+| Region Pair                      | Canada Central <-> Canada East (not leveraged)           |
 
 ### Region Selection Considerations
 
-- [ ] Compliance and data sovereignty requirements verified
-- [ ] Required Azure services available in selected regions
-- [ ] Latency requirements validated with target user base
-- [ ] Region pair strategy aligns with DR requirements
-- [ ] Cost differences between regions evaluated
+- [x] Compliance and data sovereignty requirements verified
+- [x] Required Azure services available in selected regions
+- [x] Latency requirements validated with target user base
+- [ ] Region pair strategy aligns with DR requirements -- **NOT IMPLEMENTED**
+- [x] Cost differences between regions evaluated
+
+### Planned Improvements
+
+- Evaluate Canada East as a DR region
+- Implement geo-redundant backups leveraging the region pair
 
 ---
 
 ## 5. Azure Services Inventory
 
-| Service Type       | Resource Name                  | SKU / Tier          | Resource Group              | Region     | Purpose                            | Monthly Cost Estimate |
-|--------------------|--------------------------------|---------------------|-----------------------------|------------|------------------------------------|-----------------------|
-| AKS                | [aks-app-prod-eus-001]         | [Standard]          | [rg-app-prod-eus-001]       | [East US]  | [Container orchestration]          | [USD $X,XXX]          |
-| App Service        | [app-web-prod-eus-001]         | [P1v3]              | [rg-app-prod-eus-001]       | [East US]  | [Web frontend]                     | [USD $XXX]            |
-| Azure Functions    | [func-proc-prod-eus-001]       | [Premium EP1]       | [rg-app-prod-eus-001]       | [East US]  | [Background processing]            | [USD $XXX]            |
-| Virtual Machine    | [vm-legacy-prod-eus-001]       | [Standard_D4s_v5]   | [rg-app-prod-eus-001]       | [East US]  | [Legacy service hosting]           | [USD $XXX]            |
-| SQL Database       | [sql-db-prod-eus-001]          | [Business Critical] | [rg-data-prod-eus-001]      | [East US]  | [Primary relational datastore]     | [USD $X,XXX]          |
-| Storage Account    | [stapprodeus001]               | [Standard LRS]      | [rg-data-prod-eus-001]      | [East US]  | [Blob and file storage]            | [USD $XXX]            |
-| Key Vault          | [kv-app-prod-eus-001]          | [Standard]          | [rg-infra-prod-eus-001]     | [East US]  | [Secrets management]               | [USD $XX]             |
-| Application Insights | [ai-app-prod-eus-001]        | [Pay-as-you-go]     | [rg-infra-prod-eus-001]     | [East US]  | [Application monitoring]           | [USD $XXX]            |
-| [SERVICE TYPE]     | [RESOURCE NAME]                | [SKU/TIER]          | [RESOURCE GROUP]            | [REGION]   | [PURPOSE]                          | [USD $X,XXX]          |
+| Service Type             | Resource Name                  | SKU / Tier                    | Resource Group              | Region           | Purpose                            | Monthly Cost Estimate (CAD) |
+|--------------------------|--------------------------------|-------------------------------|-----------------------------|-----------------|------------------------------------|------------------------------|
+| Container Apps           | cmmc-api                       | Consumption (0.5 CPU, 1Gi)   | rg-cmmc-assessor-prod       | Canada Central   | Backend API service                | $0-35                        |
+| Container Apps           | cmmc-web                       | Consumption (0.25 CPU, 0.5Gi)| rg-cmmc-assessor-prod       | Canada Central   | Frontend web application           | $0-10                        |
+| Container Registry       | acrcmmcassessorprod             | Basic                         | rg-cmmc-assessor-prod       | Canada Central   | Container image storage            | ~$7                          |
+| PostgreSQL Flexible      | psql-cmmc-assessor-prod         | B1ms (1 vCore, 2GB, 32GB)   | rg-cmmc-assessor-prod       | Canada Central   | Primary relational datastore       | ~$22                         |
+| Storage Account          | stcmmcassessorprod              | Standard_LRS                  | rg-cmmc-assessor-prod       | Canada Central   | Blob and file storage              | ~$2                          |
+| Key Vault                | kv-cmmc-assessor-prod           | Standard                      | rg-cmmc-assessor-prod       | Canada Central   | Secrets management                 | ~$4                          |
+| Log Analytics            | log-cmmc-assessor-prod          | PerGB2018 (30-day retention) | rg-cmmc-assessor-prod       | Canada Central   | Centralized log aggregation        | ~$0 (free tier)              |
+| Container Apps Environment | cae-cmmc-assessor-prod        | Consumption                   | rg-cmmc-assessor-prod       | Canada Central   | Container Apps hosting environment | Included                     |
+| **Total**                |                                 |                               |                             |                  |                                    | **~$35-70**                  |
 
 ---
 
@@ -117,19 +112,24 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Attribute                           | Value                                                      |
 |-------------------------------------|------------------------------------------------------------|
-| Landing Zone Framework              | [Azure Landing Zone / CAF / Custom]                        |
-| Reference Architecture              | [e.g., Enterprise-Scale, Start Small]                      |
-| Hub-Spoke / Virtual WAN             | [Hub-Spoke / Virtual WAN / N/A]                            |
-| Platform Landing Zone               | [Connectivity, Identity, Management subscription details]  |
-| Application Landing Zone            | [Workload subscription details]                            |
+| Landing Zone Framework              | N/A -- no landing zone framework adopted                   |
+| Reference Architecture              | N/A                                                        |
+| Hub-Spoke / Virtual WAN             | N/A -- no VNet deployed (security finding F-09)            |
+| Platform Landing Zone               | N/A                                                        |
+| Application Landing Zone            | Single resource group, flat architecture                   |
 
 ### Landing Zone Compliance Checklist
 
-- [ ] Identity and access management aligned with landing zone design
-- [ ] Network topology follows hub-spoke / Virtual WAN pattern
-- [ ] Logging and monitoring centralized in management subscription
-- [ ] Security baselines applied via Azure Policy
-- [ ] Subscription vending process defined
+- [ ] Identity and access management aligned with landing zone design -- **NOT IMPLEMENTED**
+- [ ] Network topology follows hub-spoke / Virtual WAN pattern -- **NOT IMPLEMENTED (F-09)**
+- [ ] Logging and monitoring centralized in management subscription -- **Partial: Log Analytics exists but limited**
+- [ ] Security baselines applied via Azure Policy -- **NOT IMPLEMENTED**
+- [ ] Subscription vending process defined -- **N/A (single subscription)**
+
+### Planned Improvements
+
+- Adopt Azure Landing Zone best practices as the project matures
+- Implement VNet integration as part of Phase 1 remediation (F-09)
 
 ---
 
@@ -139,24 +139,23 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Tag Name            | Required / Optional | Example Value             | Purpose                                    |
 |---------------------|---------------------|---------------------------|--------------------------------------------|
-| `Environment`       | Required            | `Production`              | Identify deployment environment            |
-| `Application`       | Required            | `[PROJECT NAME]`          | Associate resource with application        |
-| `Owner`             | Required            | `[team@company.com]`      | Identify responsible team                  |
-| `CostCenter`        | Required            | `[CC-12345]`              | Financial tracking and chargeback          |
-| `Department`        | Optional            | `[Engineering]`           | Organizational mapping                     |
-| `CreatedBy`         | Optional            | `[Terraform / Manual]`    | Track provisioning method                  |
-| `DataClassification`| Required            | `[Confidential]`          | Data handling requirements                 |
-| `Compliance`        | Optional            | `[SOC2 / HIPAA / N/A]`    | Regulatory compliance scope                |
-| `DR-Tier`           | Optional            | `[Tier-1]`                | Disaster recovery priority                 |
-| `MaintenanceWindow` | Optional            | `[Sat 02:00-06:00 UTC]`   | Scheduled maintenance window               |
+| `project`           | Required            | `cmmc-assessor`           | Associate resource with the project        |
+| `environment`       | Required            | `production`              | Identify deployment environment            |
+| `managedBy`         | Required            | `bicep`                   | Track provisioning method (IaC tool)       |
 
 ### 7.2 Tag Enforcement
 
-| Enforcement Method   | Scope                  | Tags Enforced                         | Effect           |
-|----------------------|------------------------|---------------------------------------|------------------|
-| Azure Policy         | [Management Group]     | `Environment`, `Application`, `Owner` | [Deny / Audit]   |
-| IaC Template Default | [All IaC deployments]  | All required tags                     | [Hard-coded]     |
-| Manual Review        | [Ad-hoc resources]     | All tags                              | [Governance]     |
+| Enforcement Method   | Scope                  | Tags Enforced                              | Effect           |
+|----------------------|------------------------|--------------------------------------------|------------------|
+| Bicep Templates      | All IaC deployments    | `project`, `environment`, `managedBy`      | Hard-coded       |
+| Azure Policy         | NOT IMPLEMENTED        | N/A                                        | N/A              |
+
+> **Note:** Tag enforcement via Azure Policy is NOT IMPLEMENTED. Tags are currently only applied through Bicep templates. No deny/audit policies exist.
+
+### Planned Improvements
+
+- Add Azure Policy to enforce required tags at the resource group scope
+- Add additional tags: `Owner`, `CostCenter`, `DataClassification`
 
 ---
 
@@ -166,29 +165,34 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Attribute                      | Value                                          |
 |--------------------------------|------------------------------------------------|
-| Cost Management Scope          | [Subscription / Management Group]              |
-| Budget Notification Threshold  | [50%, 75%, 90%, 100%]                          |
-| Budget Alert Recipients        | [DISTRIBUTION LIST OR TEAM EMAIL]              |
-| Cost Anomaly Detection         | [Enabled / Disabled]                           |
-| Export Schedule                 | [Daily / Weekly export to Storage Account]     |
-| Reporting Frequency            | [Monthly cost review cadence]                  |
+| Cost Management Scope          | Subscription                                   |
+| Budget Notification Threshold  | NOT IMPLEMENTED                                |
+| Budget Alert Recipients        | NOT IMPLEMENTED                                |
+| Cost Anomaly Detection         | NOT IMPLEMENTED                                |
+| Export Schedule                 | NOT IMPLEMENTED                                |
+| Reporting Frequency            | Ad-hoc manual review                           |
 
 ### 8.2 Budget Summary
 
-| Subscription / Scope        | Monthly Budget  | Alert Thresholds        | Action Group              |
-|------------------------------|-----------------|-------------------------|---------------------------|
-| [Production]                 | [USD $XX,XXX]   | [50%, 75%, 90%, 100%]   | [ag-cost-alerts-prod]     |
-| [Non-Production]             | [USD $X,XXX]    | [75%, 100%]             | [ag-cost-alerts-nonprod]  |
+| Subscription / Scope        | Monthly Budget    | Alert Thresholds        | Action Group              |
+|------------------------------|-------------------|-------------------------|---------------------------|
+| CMMC Assessor Production     | CAD ~$70 (soft)   | NOT IMPLEMENTED         | NOT IMPLEMENTED           |
 
 ### 8.3 Cost Optimization Measures
 
-- [ ] Reserved Instances purchased for predictable workloads
-- [ ] Azure Savings Plans evaluated for compute
-- [ ] Auto-shutdown configured for non-production VMs
-- [ ] AKS node pool autoscaling configured with appropriate min/max
-- [ ] Storage lifecycle management policies in place
-- [ ] Unused resources identified and decommissioned (Azure Advisor)
-- [ ] Right-sizing recommendations reviewed monthly
+- [ ] Reserved Instances purchased for predictable workloads -- **N/A (Consumption model)**
+- [ ] Azure Savings Plans evaluated for compute -- **Not evaluated**
+- [ ] Auto-shutdown configured for non-production VMs -- **N/A (no VMs)**
+- [x] Container Apps scale-to-zero configured for cost optimization
+- [ ] Storage lifecycle management policies in place -- **NOT IMPLEMENTED**
+- [ ] Unused resources identified and decommissioned (Azure Advisor) -- **Not reviewed**
+- [ ] Right-sizing recommendations reviewed monthly -- **NOT IMPLEMENTED**
+
+### Planned Improvements
+
+- Set up Azure budget alerts at CAD $100/month threshold
+- Configure cost anomaly detection
+- Review Azure Advisor recommendations monthly
 
 ---
 
@@ -198,27 +202,21 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Policy / Initiative                     | Scope                  | Effect       | Purpose                                     |
 |-----------------------------------------|------------------------|--------------|---------------------------------------------|
-| [Allowed locations]                     | [Management Group]     | [Deny]       | [Restrict deployments to approved regions]   |
-| [Require tag on resource group]         | [Subscription]         | [Deny]       | [Enforce tagging compliance]                 |
-| [Audit VMs without managed disks]       | [Subscription]         | [Audit]      | [Security baseline]                          |
-| [Deploy Diagnostic Settings]            | [Management Group]     | [DeployIfNotExists] | [Centralized logging]                 |
-| [Allowed resource types]               | [Subscription]         | [Deny]       | [Prevent unapproved resource types]          |
-| [POLICY NAME]                           | [SCOPE]                | [EFFECT]     | [PURPOSE]                                    |
+| NOT IMPLEMENTED                         | N/A                    | N/A          | No Azure Policies are configured            |
+
+> **Status: NOT IMPLEMENTED.** No Azure Policies are assigned. Governance is currently managed manually through IaC (Bicep) and code review processes.
 
 ### 9.2 Azure Blueprints (if applicable)
 
-| Blueprint Name                 | Version   | Scope                | Artifacts Included                          |
-|--------------------------------|-----------|----------------------|---------------------------------------------|
-| [bp-baseline-governance]       | [v1.0]    | [Management Group]   | [Policy, RBAC, Resource Groups, ARM templates] |
+N/A -- Azure Blueprints are not used.
 
 ### 9.3 Regulatory Compliance
 
-| Standard              | Azure Compliance Status | Assessment Frequency | Owner            |
-|-----------------------|------------------------|----------------------|------------------|
-| [SOC 2 Type II]       | [Compliant]            | [Annual]             | [TEAM NAME]      |
-| [ISO 27001]           | [In Progress]          | [Annual]             | [TEAM NAME]      |
-| [GDPR]                | [Compliant]            | [Continuous]         | [TEAM NAME]      |
-| [STANDARD]            | [STATUS]               | [FREQUENCY]          | [OWNER]          |
+| Standard              | Azure Compliance Status | Assessment Frequency | Owner                |
+|-----------------------|------------------------|----------------------|----------------------|
+| CMMC Level 2          | In Progress            | Continuous           | IntelliSec Solutions |
+
+> **Note:** The platform itself is a CMMC assessment tool. The platform's own compliance posture is being hardened through ongoing security remediation (tracked as security findings F-01 through F-43+).
 
 ---
 
@@ -226,5 +224,4 @@ rg-{workload}-{environment}-{region}-{instance}
 
 | Date           | Author            | Changes Made                              |
 |----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| 2026-02-14     | IntelliSec Solutions | Initial document creation              |

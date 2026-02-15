@@ -2,19 +2,19 @@
 
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
-| Page Title       | [PROJECT_NAME] - Data Architecture             |
-| Last Updated     | [YYYY-MM-DD]                                   |
-| Status           | `DRAFT` / `IN REVIEW` / `APPROVED`             |
-| Owner            | [OWNER_NAME]                                   |
-| Reviewers        | [REVIEWER_1], [REVIEWER_2], [REVIEWER_3]       |
-| Version          | [VERSION_NUMBER, e.g., 1.0]                    |
-| Related HLD      | [LINK_TO_ARCHITECTURE_OVERVIEW_HLD]            |
+| Page Title       | CMMC Assessor Platform - Data Architecture     |
+| Last Updated     | 2026-02-14                                     |
+| Status           | `DRAFT`                                        |
+| Owner            | Solution Architect                             |
+| Reviewers        | Technical Lead, Security Architect, Engineering Manager |
+| Version          | 0.1                                            |
+| Related HLD      | CMMC Assessor Platform - Architecture Overview (HLD) |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the data architecture for **[PROJECT_NAME]**. It covers all data stores, data classifications, data flows, retention policies, backup and recovery strategies, and data privacy considerations. This document ensures that data is managed consistently, securely, and in compliance with applicable regulations.
+This document defines the data architecture for the **CMMC Assessor Platform**. It covers all data stores, data classifications, data flows, retention policies, backup and recovery strategies, and data privacy considerations. This document ensures that data is managed consistently, securely, and in compliance with applicable regulations, particularly those related to Controlled Unclassified Information (CUI) and CMMC assessment data.
 
 ---
 
@@ -22,15 +22,11 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Store Name | Type | Azure Service | SKU / Tier | Purpose | Data Classification | Retention | Region |
 |-----------|------|--------------|------------|---------|--------------------|-----------|---------|
-| [DB_NAME_1] | Relational (SQL) | Azure Database for PostgreSQL - Flexible Server | [e.g., GP D4s_v3, 128 GB] | [e.g., User accounts, roles, permissions] | Confidential | [e.g., Lifetime of account + 7 years] | [e.g., West Europe] |
-| [DB_NAME_2] | Relational (SQL) | Azure Database for PostgreSQL - Flexible Server | [e.g., GP D4s_v3, 256 GB] | [e.g., Orders, payments, transactions] | Confidential | [e.g., 7 years (regulatory)] | [e.g., West Europe] |
-| [DB_NAME_3] | Document (NoSQL) | Azure Cosmos DB | [e.g., Serverless] | [e.g., Product catalog, user preferences] | Internal | [e.g., Active + 1 year archive] | [e.g., West Europe] |
-| [CACHE_NAME] | Key-Value (Cache) | Azure Cache for Redis | [e.g., Premium P1] | [e.g., Session state, API response caching] | Internal | [e.g., Ephemeral (TTL-based)] | [e.g., West Europe] |
-| [BLOB_NAME] | Object / Blob | Azure Blob Storage | [e.g., Standard GRS] | [e.g., Document uploads, report outputs, media] | Confidential | [e.g., 5 years, then archive tier] | [e.g., West Europe] |
-| [SEARCH_NAME] | Search Index | Azure AI Search | [e.g., Standard S1] | [e.g., Full-text product search, faceted navigation] | Internal | [e.g., Rebuilt from source on demand] | [e.g., West Europe] |
-| [DW_NAME] | Data Warehouse | [e.g., Azure Synapse Analytics / Azure SQL] | [e.g., DW100c] | [e.g., Business intelligence, reporting] | Confidential | [e.g., 5 years] | [e.g., West Europe] |
-| [QUEUE_STORE] | Message Queue | Azure Service Bus | [e.g., Premium] | [e.g., Async message delivery between services] | Internal | [e.g., 14 days max TTL] | [e.g., West Europe] |
-| [ADDITIONAL_STORE] | [TYPE] | [AZURE_SERVICE] | [SKU] | [PURPOSE] | [CLASSIFICATION] | [RETENTION] | [REGION] |
+| cmmc-assessor-prod (PostgreSQL) | Relational (SQL) | Azure Database for PostgreSQL Flexible Server (psql-cmmc-assessor-prod) | B1ms (1 vCore, 2GB RAM) | All application data: tenants, users, assessments, controls, objectives, responses, POA&Ms, policies, audit logs, tokens (22 tables) | Confidential (contains CUI assessment data, user PII, encrypted tokens) | Lifetime of tenant + regulatory retention period | Canada Central |
+| stcmmcassessorprod (Blob Storage) | Object / Blob | Azure Storage Account | Standard_LRS | Evidence file uploads, generated export files (Excel, PDF, DOCX), temporary file staging | Confidential (evidence files may contain CUI) | Lifetime of associated assessment; deletion on tenant offboarding | Canada Central |
+| SharePoint (via Graph API) | Document Library | Microsoft 365 SharePoint Online (external to Azure infrastructure) | Customer's M365 license | Primary evidence document storage and management per tenant's SharePoint site | Confidential (evidence files related to CMMC compliance, may contain CUI) | Managed by tenant's SharePoint retention policies | Determined by tenant's M365 tenant geography |
+| Azure Key Vault (kv-cmmc-assessor-prod) | Secret / Key Store | Azure Key Vault | Standard | Secrets: database connection strings, JWT signing keys, MSAL client secrets, AES-256 encryption keys | Restricted (cryptographic keys and credentials) | Secrets rotated per rotation policy; soft-delete enabled with 90-day purge protection | Canada Central |
+| Azure Log Analytics (log-cmmc-assessor-prod) | Log Store | Azure Log Analytics Workspace | PerGB2018 | Container Apps console logs, system metrics, diagnostic data | Internal (operational logs; may contain user identifiers in audit-related log entries) | 30 days (current); to be reviewed for compliance requirements | Canada Central |
 
 ---
 
@@ -39,26 +35,29 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 <!-- Insert data flow diagram here using draw.io/Lucidchart -->
 <!--
     Show:
-    - All data stores from the inventory above
-    - Data producers (services, users, external systems)
-    - Data consumers (services, reports, analytics)
-    - Direction and nature of data flow (read, write, sync, async)
-    - Data transformation points (ETL, stream processing)
-    - Boundaries (trust boundaries, network boundaries)
-    Recommended tool: draw.io, Lucidchart
+    - Browser (cmmc-web SPA) -> cmmc-api (HTTPS REST)
+    - cmmc-api -> PostgreSQL (Prisma ORM, TCP)
+    - cmmc-api -> Microsoft Entra ID (OAuth 2.0, HTTPS)
+    - cmmc-api -> Microsoft Graph API (SharePoint, HTTPS)
+    - cmmc-api -> Azure Blob Storage (HTTPS)
+    - cmmc-api -> Azure Key Vault (HTTPS, startup)
+    - Container Apps -> Log Analytics (system logs)
+    - GitHub Actions -> Azure Container Registry -> Container Apps (CI/CD)
 -->
 
 ### 3.1 Data Flow Summary
 
 | # | Source | Destination | Data Description | Flow Type | Frequency | Volume |
 |---|--------|-------------|-----------------|-----------|-----------|--------|
-| 1 | [WEB_FRONTEND] | [SERVICE_A] | [e.g., User registration data] | Sync (REST) | [e.g., On demand] | [e.g., ~500 req/day] |
-| 2 | [SERVICE_A] | [DB_NAME_1] | [e.g., User profile CRUD] | Sync (SQL) | [e.g., On demand] | [e.g., ~2,000 ops/day] |
-| 3 | [SERVICE_B] | [SERVICE_BUS] | [e.g., OrderPlaced events] | Async (AMQP) | [e.g., On demand] | [e.g., ~1,000 events/day] |
-| 4 | [SERVICE_C] | [BLOB_STORAGE] | [e.g., Generated PDF reports] | Sync (REST) | [e.g., Nightly batch] | [e.g., ~200 files/day, 5MB avg] |
-| 5 | [DB_NAME_2] | [DW_NAME] | [e.g., Transactional data for BI] | Batch (ETL) | [e.g., Every 6 hours] | [e.g., ~500K rows/batch] |
-| 6 | [EXTERNAL_SYSTEM] | [SERVICE_A] | [e.g., User sync from HR system] | Batch (SFTP/API) | [e.g., Daily at 02:00 UTC] | [e.g., ~10K records] |
-| [#] | [SOURCE] | [DESTINATION] | [DESCRIPTION] | [FLOW_TYPE] | [FREQUENCY] | [VOLUME] |
+| 1 | cmmc-web (Browser) | cmmc-api | User actions: assessment CRUD, objective responses, implementation updates, POA&M management, policy acknowledgments, team management, SSP configuration | Sync (HTTPS REST) | On demand | Estimated ~500-2,000 API calls/day during active assessment |
+| 2 | cmmc-api | PostgreSQL | All application data reads and writes: tenant-scoped queries via Prisma ORM | Sync (TCP/PostgreSQL) | On demand | ~2,000-5,000 queries/day |
+| 3 | cmmc-api | Microsoft Entra ID | OAuth 2.0 token exchange: authorization code -> access/ID tokens; token refresh; user info | Sync (HTTPS) | On login, token refresh | ~50-200 auth events/day |
+| 4 | cmmc-api | Microsoft Graph API (SharePoint) | Evidence file operations: list, upload, download, preview, delete on tenant's SharePoint document library | Sync (HTTPS REST) | On demand during evidence management | ~50-500 operations/day; file sizes 1KB-50MB typical |
+| 5 | cmmc-api | Azure Blob Storage | Temporary evidence file staging, generated export files (Excel, PDF, DOCX) | Sync (HTTPS REST) | On demand during evidence upload and export generation | ~10-100 files/day; 1KB-50MB per file |
+| 6 | cmmc-api | Azure Key Vault | Secret retrieval at application startup and on-demand for encryption operations | Sync (HTTPS) | On container start + periodic | ~10-50 requests/day |
+| 7 | cmmc-api (AuditLog) | PostgreSQL (AuditLog table) | Immutable audit trail entries for all significant entity mutations | Sync (within transaction) | On every create/update/delete of assessed entities | ~500-2,000 audit entries/day |
+| 8 | Container Apps | Log Analytics | Container stdout/stderr logs, system metrics, health probe results | Async (platform-managed) | Continuous | Varies; estimated ~100MB-500MB/month |
+| 9 | GitHub Actions | Azure Container Registry + Container Apps | Docker image push and container revision deployment | Sync (CI/CD) | On merge to main | ~2-10 deployments/week |
 
 ---
 
@@ -66,26 +65,42 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 <!-- Insert ERD here using draw.io/Lucidchart/dbdiagram.io -->
 <!--
-    Show:
-    - All major entities and their attributes
-    - Primary keys and foreign keys
-    - Relationship cardinality (1:1, 1:N, M:N)
-    - Data types for key columns
-    Recommended tool: dbdiagram.io, draw.io, Lucidchart, or DBeaver
+    Show all 22 Prisma models with relationships:
+    Tenant (root) -> TeamMember, Assessment, TenantPolicy, AuditLog, SSPConfig, TenantInvitation
+    User -> TeamMember, ObjectiveResponse, PolicyAcknowledgment, UserToken, RefreshToken, AuditLog
+    Assessment -> AssessmentObjective, ControlResponse, ControlImplementation, POAMItem
+    Control -> AssessmentObjective, ControlResponse, ControlImplementation, POAMItem
+    AssessmentObjective -> ObjectiveResponse
+    TenantPolicy -> PolicyVersion -> PolicyAcknowledgment
+    POAMItem -> POAMEvidence
 -->
 
 ### 4.1 Logical Data Model - Key Entities
 
 | Entity | Description | Key Attributes | Relationships |
 |--------|-------------|---------------|---------------|
-| User | [e.g., Registered user account] | `id`, `email`, `display_name`, `status`, `created_at` | Has many Orders, has many Roles |
-| Role | [e.g., Authorization role] | `id`, `name`, `description` | Belongs to many Users |
-| Order | [e.g., Customer purchase order] | `id`, `user_id`, `status`, `total`, `currency`, `created_at` | Belongs to User, has many OrderItems, has many Payments |
-| OrderItem | [e.g., Line item within an order] | `id`, `order_id`, `product_id`, `quantity`, `unit_price` | Belongs to Order |
-| Product | [e.g., Purchasable product/service] | `id`, `name`, `description`, `price`, `category`, `status` | Has many OrderItems |
-| Payment | [e.g., Payment transaction record] | `id`, `order_id`, `amount`, `provider`, `status`, `processed_at` | Belongs to Order |
-| AuditLog | [e.g., Immutable audit trail entry] | `id`, `entity_type`, `entity_id`, `action`, `actor_id`, `timestamp`, `changes` | References User (actor) |
-| [ADDITIONAL_ENTITY] | [DESCRIPTION] | [KEY_ATTRIBUTES] | [RELATIONSHIPS] |
+| Tenant | Root multi-tenant entity representing an organization using the platform | `id`, `name`, `domain`, `entraIdTenantId`, `sharepointSiteUrl`, `settings` | Has many TeamMembers, Assessments, TenantPolicies, AuditLogs, TenantInvitations; has one SSPConfig |
+| User | Registered user account (Entra ID or legacy auth) | `id`, `email`, `name`, `passwordHash`, `entraIdObjectId`, `platformRole`, `status` | Has many TeamMembers (multi-tenant membership), ObjectiveResponses, PolicyAcknowledgments, UserTokens, RefreshTokens |
+| TeamMember | Association between User and Tenant with a team role | `id`, `userId`, `tenantId`, `role` | Belongs to User, belongs to Tenant |
+| Assessment | CMMC assessment instance within a tenant | `id`, `tenantId`, `name`, `description`, `status`, `level`, `score` | Belongs to Tenant; has many AssessmentObjectives, ControlResponses, ControlImplementations |
+| Control | CMMC control reference data (e.g., AC.L2-3.1.1) | `id`, `controlId`, `domain`, `family`, `title`, `description`, `level`, `weight` | Has many AssessmentObjectives, ControlResponses, ControlImplementations, POAMItems |
+| AssessmentObjective | Individual assessment objective tied to a control | `id`, `assessmentId`, `controlId`, `objectiveId`, `description`, `tenantId` | Belongs to Assessment, belongs to Control; has many ObjectiveResponses |
+| ObjectiveResponse | Assessor's response to an objective (MET/NOT_MET/NA) | `id`, `objectiveId`, `response`, `notes`, `assessorId`, `tenantId` | Belongs to AssessmentObjective, belongs to User (assessor) |
+| ControlResponse | Aggregated control-level assessment response | `id`, `assessmentId`, `controlId`, `status`, `notes`, `tenantId` | Belongs to Assessment, belongs to Control |
+| ControlImplementation | Implementation status and evidence for a control | `id`, `assessmentId`, `controlId`, `status`, `description`, `evidence`, `tenantId` | Belongs to Assessment, belongs to Control |
+| POAMItem | Plan of Action and Milestones item for non-compliant controls | `id`, `tenantId`, `controlId`, `weakness`, `milestone`, `scheduledCompletionDate`, `status` | Belongs to Tenant, belongs to Control; has many POAMEvidence |
+| POAMEvidence | Evidence file attached to a POA&M item | `id`, `poamItemId`, `fileName`, `fileUrl` | Belongs to POAMItem |
+| TenantPolicy | Security policy document managed by a tenant | `id`, `tenantId`, `title`, `content`, `status`, `category` | Belongs to Tenant; has many PolicyVersions |
+| PolicyVersion | Versioned snapshot of a policy's content | `id`, `policyId`, `version`, `content`, `changedBy` | Belongs to TenantPolicy; has many PolicyAcknowledgments |
+| PolicyAcknowledgment | User's acknowledgment of a specific policy version | `id`, `policyVersionId`, `userId`, `acknowledgedAt` | Belongs to PolicyVersion, belongs to User |
+| AuditLog | Immutable audit trail entry for compliance | `id`, `tenantId`, `entityType`, `entityId`, `action`, `actorId`, `changes`, `ipAddress`, `timestamp` | Belongs to Tenant, references User (actor) |
+| SSPConfig | System Security Plan configuration per tenant | `id`, `tenantId`, `organizationName`, `systemName`, `config` | Belongs to Tenant (one-to-one) |
+| UserToken | Encrypted Microsoft Graph API tokens per user | `id`, `userId`, `accessToken`, `refreshToken`, `expiresAt`, `scope` | Belongs to User |
+| RefreshToken | JWT refresh token with family-based rotation tracking | `id`, `userId`, `token`, `family`, `expiresAt`, `isRevoked` | Belongs to User |
+| TokenDenyList | Revoked JWT for server-side logout enforcement | `id`, `token`, `expiresAt`, `revokedAt` | No foreign keys (standalone) |
+| Invitation | Legacy invitation records | `id`, `email`, `role`, `tenantId`, `invitedBy`, `status`, `expiresAt` | Belongs to Tenant |
+| TenantInvitation | Active tenant invitation for team onboarding | `id`, `email`, `role`, `tenantId`, `invitedById`, `status`, `token`, `expiresAt` | Belongs to Tenant, belongs to User (inviter) |
+| Organization | Legacy organization entity (deprecated, migrating to Tenant) | `id`, `name`, `description` | Legacy references from Assessment (being removed) |
 
 ---
 
@@ -95,25 +110,33 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Classification Level | Definition | Examples | Handling Requirements |
 |---------------------|------------|----------|----------------------|
-| **Public** | Data intended for public consumption | Marketing content, public API docs | No special controls required |
-| **Internal** | Data for internal use, low risk if exposed | Internal dashboards, non-sensitive configs | Access restricted to authenticated employees |
-| **Confidential** | Sensitive business or personal data | Customer PII, financial records, contracts | Encryption required, access logged, need-to-know basis |
-| **Restricted** | Highly sensitive data, significant harm if exposed | Passwords, encryption keys, payment card data | Strongest encryption, strict access controls, additional audit |
+| **Public** | Data intended for public consumption | CMMC framework descriptions (publicly available from DoD), marketing content | No special controls required |
+| **Internal** | Operational data with low risk if exposed | Application logs (excluding PII), system metrics, CMMC control reference data, non-sensitive configuration | Access restricted to authenticated team members; encryption in transit |
+| **Confidential** | Sensitive business data, assessment data, user PII | Assessment results, SPRS scores, objective responses, implementation details, user profiles, tenant configurations, evidence files, POA&M items | Encryption at rest and in transit, tenant isolation enforced, access logged, RBAC-controlled |
+| **Restricted** | Highly sensitive data, significant harm if exposed | Cryptographic keys (JWT signing, AES-256 encryption), database credentials, MSAL client secrets, Graph API tokens, password hashes | Strongest encryption, Azure Key Vault storage, no human-readable access, automated rotation planned |
 
 ### 5.2 Data Element Classification Matrix
 
 | Data Element | Example Values | Classification | Encrypted at Rest | Encrypted in Transit | Masking in Logs | Access Control |
 |-------------|----------------|---------------|-------------------|---------------------|-----------------|----------------|
-| User Email | user@example.com | Confidential | Yes (TDE / SSE) | Yes (TLS 1.2+) | Partial (`u***@example.com`) | RBAC (Admin, Support) |
-| User Display Name | John Doe | Internal | Yes (TDE / SSE) | Yes (TLS 1.2+) | No | RBAC (All authenticated) |
-| Password Hash | bcrypt hash | Restricted | Yes (TDE / SSE) | Yes (TLS 1.2+) | Full mask | System only (no human access) |
-| Payment Card Number | 4111...1111 | Restricted | Yes (tokenized via PCI-compliant provider) | Yes (TLS 1.2+) | Tokenized | PCI DSS scoped systems only |
-| Order Total | 149.99 | Confidential | Yes (TDE / SSE) | Yes (TLS 1.2+) | No | RBAC (Admin, Finance) |
-| Product Name | Widget Pro | Public | Yes (TDE / SSE) | Yes (TLS 1.2+) | No | Public |
-| API Keys / Secrets | sk_live_... | Restricted | Yes (Key Vault HSM) | Yes (TLS 1.2+) | Full mask | Managed Identity only |
-| IP Address | 192.168.1.1 | Confidential | Yes (TDE / SSE) | Yes (TLS 1.2+) | Full mask | RBAC (Admin, Security) |
-| Audit Log Entries | Action timestamps | Internal | Yes (TDE / SSE) | Yes (TLS 1.2+) | No | RBAC (Admin, Compliance) |
-| [ADDITIONAL_ELEMENT] | [EXAMPLE] | [CLASSIFICATION] | [AT_REST] | [IN_TRANSIT] | [MASKING] | [ACCESS] |
+| User Email | assessor@company.com | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No (required for audit trail) | RBAC (tenant-scoped) |
+| User Display Name | Jane Smith | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped) |
+| Password Hash (legacy auth) | bcrypt hash | Restricted | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | Full mask | System only (no human access, no API exposure) |
+| Assessment Results / SPRS Score | -87, 42, 110 | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped, ASSESSOR+ for write) |
+| Objective Responses (MET/NOT_MET/NA) | MET, NOT_MET | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped, ASSESSOR+ for write) |
+| Control Implementation Details | Description text, evidence references | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped, ASSESSOR+ for write) |
+| POA&M Items | Weakness descriptions, milestones, schedules | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped, ASSESSOR+ for write) |
+| Evidence Files (Blob/SharePoint) | PDF, DOCX, images | Confidential | Yes (Azure SSE / SharePoint encryption) | Yes (TLS 1.2+) | N/A (binary files) | RBAC (tenant-scoped); SharePoint permissions |
+| Tenant Configuration | SharePoint site URL, settings JSON | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (ADMIN+ for write) |
+| Entra ID Tenant ID | UUID | Internal | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | System use |
+| Graph API Access/Refresh Tokens | Encrypted token strings | Restricted | Yes (AES-256-GCM before DB storage + PostgreSQL TDE) | Yes (TLS 1.2+) | Full mask | System only (encrypted at application layer) |
+| JWT Signing Key | 256-bit secret | Restricted | Yes (Key Vault HSM-backed) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
+| AES-256 Encryption Key | 256-bit key | Restricted | Yes (Key Vault HSM-backed) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference; no human access |
+| Database Connection String | postgresql://user:pass@host/db | Restricted | Yes (Key Vault) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference |
+| MSAL Client Secret | Random string | Restricted | Yes (Key Vault) | Yes (TLS 1.2+) | Full mask | Container Apps secret reference |
+| Audit Log Entries | Action, actor, timestamp, changes JSON | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No (audit trail by design) | RBAC (ADMIN+); append-only (no update/delete) |
+| Policy Content | Security policy text, version history | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (tenant-scoped) |
+| SSP Configuration | Organization details, system descriptions | Confidential | Yes (PostgreSQL TDE) | Yes (TLS 1.2+) | No | RBAC (ADMIN+ for write) |
 
 ---
 
@@ -123,33 +146,40 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Data Category | Retention Period (Active) | Archive Period | Deletion Method | Regulatory Basis |
 |--------------|--------------------------|----------------|-----------------|------------------|
-| User Account Data | Lifetime of account | [e.g., 7 years post-deletion] | [e.g., Soft delete -> hard delete after archive period] | [e.g., GDPR Art. 17, Tax regulations] |
-| Transaction / Order Data | [e.g., 3 years active] | [e.g., 7 years archive (cool/archive tier)] | [e.g., Automated purge job] | [e.g., Financial regulations, tax law] |
-| Audit Logs | [e.g., 1 year hot storage] | [e.g., 7 years archive] | [e.g., Automated lifecycle policy] | [e.g., SOC 2, ISO 27001] |
-| Application Logs | [e.g., 90 days] | [e.g., None] | [e.g., Log Analytics workspace retention policy] | [e.g., Operational needs] |
-| Session / Cache Data | [e.g., TTL-based (30 min)] | N/A | [e.g., Auto-expiry by Redis] | N/A |
-| Uploaded Documents | [e.g., Lifetime of associated entity] | [e.g., 5 years archive tier] | [e.g., Blob lifecycle management policy] | [e.g., Business requirement] |
-| Backup Data | [e.g., 35 days (short-term)] | [e.g., 1 year (long-term)] | [e.g., Automatic expiry per backup policy] | [e.g., DR requirements] |
-| [ADDITIONAL_CATEGORY] | [ACTIVE_PERIOD] | [ARCHIVE_PERIOD] | [DELETION_METHOD] | [REGULATORY_BASIS] |
+| Tenant and User Account Data | Lifetime of tenant subscription | 90 days post-subscription cancellation for recovery | Soft delete (status = INACTIVE) -> hard delete after archive period, including cascade to all dependent tenant data | CMMC assessment record requirements, contractual obligation |
+| Assessment Data (assessments, objectives, responses, implementations) | Lifetime of tenant subscription | 7 years post-assessment completion (regulatory hold for CMMC audit trail) | Retain in database; archival to cold storage planned for future phase | DFARS 252.204-7012 (CUI retention), NIST SP 800-171 audit requirements |
+| POA&M Items and Evidence | Lifetime of tenant subscription + 3 years post-completion | Same as assessment data | Retain in database; evidence files retained in SharePoint/Blob | CMMC assessment continuity requirement |
+| Audit Logs (PostgreSQL AuditLog table) | Lifetime of tenant + 7 years | No separate archive (retained in primary store) | No deletion (immutable audit trail); future consideration for archival to Azure Archive tier | CMMC audit trail requirement, SOC 2-equivalent compliance |
+| Application Logs (Log Analytics) | 30 days | None | Automatic expiry per Log Analytics workspace retention policy | Operational needs; to be increased if compliance requires longer retention |
+| Refresh Tokens | Until expiry or revocation | N/A | Automatic cleanup of expired tokens via scheduled process (planned) | Security best practice |
+| Token Deny List | Until token expiry (JWT_EXPIRY, currently 7 days) | N/A | Automatic cleanup of entries where expiresAt < now (planned) | Security best practice |
+| UserTokens (Graph API tokens) | Until token refresh or user revocation | N/A | Overwritten on refresh; deleted on user account deletion | Minimal retention principle |
+| Evidence Files (Blob Storage) | Lifetime of associated assessment | Same as assessment data | Deleted on tenant offboarding; lifecycle policy to move to cool/archive tier planned | CMMC evidence requirements |
+| Evidence Files (SharePoint) | Managed by tenant's SharePoint retention policies | Managed by tenant | N/A (tenant-managed) | Tenant's own compliance requirements |
+| Backup Data (PostgreSQL) | 7 days (current PITR), increasing to 35 days | None currently | Automatic expiry per Azure backup policy | DR requirements |
+| Policy Documents and Versions | Lifetime of tenant subscription | Retained with assessment data | Cascade delete on tenant offboarding | CMMC policy compliance tracking |
 
 ### 6.2 Data Lifecycle Stages
 
 ```
-[Creation] -> [Active Use] -> [Inactive/Warm] -> [Archive/Cool] -> [Deletion/Purge]
-     |              |                |                  |                 |
-  Validation    Full access     Reduced access     Read-only,       Secure erasure,
-  & encryption  & indexing      & monitoring       moved to          crypto-shredding
-                                                   archive tier      or hard delete
+[Creation] -> [Active Use] -> [Inactive/Completed] -> [Regulatory Hold] -> [Deletion/Purge]
+     |              |                |                       |                    |
+  Validation    Full RBAC        Assessment complete     7-year hold for       Secure deletion,
+  & tenant      access &         or tenant inactive;     CMMC audit trail;     cascade to all
+  scoping       tenant-scoped    reduced access          read-only access      dependent records
+                queries          (no modifications)
 ```
 
 ### 6.3 Azure Storage Lifecycle Policies
 
 | Storage Account | Rule Name | Condition | Action |
 |----------------|-----------|-----------|--------|
-| [BLOB_STORAGE_ACCOUNT] | Move to Cool | [e.g., Blob not modified for 90 days] | Move to Cool tier |
-| [BLOB_STORAGE_ACCOUNT] | Move to Archive | [e.g., Blob not modified for 365 days] | Move to Archive tier |
-| [BLOB_STORAGE_ACCOUNT] | Delete old blobs | [e.g., Blob not modified for 2,555 days (7 years)] | Delete blob |
-| [ADDITIONAL_ACCOUNT] | [RULE_NAME] | [CONDITION] | [ACTION] |
+| stcmmcassessorprod | Move exports to Cool | Blob not modified for 30 days (generated exports that have been downloaded) | Move to Cool tier |
+| stcmmcassessorprod | Move evidence to Cool | Blob not modified for 90 days (evidence files not actively accessed) | Move to Cool tier (planned) |
+| stcmmcassessorprod | Move to Archive | Blob not modified for 365 days | Move to Archive tier (planned) |
+| stcmmcassessorprod | Delete temporary files | Blob with prefix `temp/` not modified for 7 days | Delete blob |
+
+**Note:** Storage lifecycle policies are planned but not yet implemented. Current state: all blobs remain in Hot tier.
 
 ---
 
@@ -159,67 +189,57 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Data Store | Backup Method | Frequency | Retention | RPO | RTO | Geo-Redundancy | Tested |
 |-----------|--------------|-----------|-----------|-----|-----|-----------------|--------|
-| [DB_NAME_1] (PostgreSQL) | [e.g., Azure automated backups (point-in-time restore)] | [e.g., Continuous (WAL)] | [e.g., 35 days PITR] | [e.g., < 5 minutes] | [e.g., < 1 hour] | [e.g., Yes (geo-redundant backup)] | [e.g., Quarterly] |
-| [DB_NAME_2] (PostgreSQL) | [e.g., Azure automated backups + weekly long-term] | [e.g., Continuous + weekly] | [e.g., 35 days PITR + 1 year LTR] | [e.g., < 5 minutes] | [e.g., < 1 hour] | [e.g., Yes] | [e.g., Quarterly] |
-| [DB_NAME_3] (Cosmos DB) | [e.g., Continuous backup mode] | [e.g., Continuous] | [e.g., 30 days] | [e.g., 0 (continuous)] | [e.g., < 4 hours (support request)] | [e.g., Yes (multi-region writes)] | [e.g., Quarterly] |
-| [BLOB_STORAGE] | [e.g., Soft delete + versioning + GRS] | [e.g., Continuous (versioning)] | [e.g., 30 days soft delete, versioning unlimited] | [e.g., 0] | [e.g., < 30 minutes] | [e.g., Yes (RA-GRS)] | [e.g., Quarterly] |
-| [REDIS_CACHE] | [e.g., RDB snapshots (Premium tier)] | [e.g., Every 6 hours] | [e.g., 2 snapshots] | [e.g., < 6 hours] | [e.g., < 30 minutes] | [e.g., No (ephemeral cache)] | [e.g., Annually] |
-| [VM_DATA] | [e.g., Azure Backup (VM snapshots)] | [e.g., Daily] | [e.g., 30 days daily, 12 months monthly] | [e.g., < 24 hours] | [e.g., < 4 hours] | [e.g., Yes (GRS vault)] | [e.g., Quarterly] |
-| [ADDITIONAL_STORE] | [BACKUP_METHOD] | [FREQUENCY] | [RETENTION] | [RPO] | [RTO] | [GEO_REDUNDANCY] | [TESTED] |
+| PostgreSQL (psql-cmmc-assessor-prod) | Azure automated backups (point-in-time restore) | Continuous (WAL-based) | 7 days PITR (current); planned increase to 35 days | < 5 minutes | < 1 hour | No (locally redundant backups currently); geo-redundant backup planned | Not yet tested |
+| Azure Blob Storage (stcmmcassessorprod) | Soft delete + Standard_LRS | Continuous (on write) | 7 days soft delete (planned) | 0 (synchronous writes) | < 30 minutes | No (LRS currently); upgrade to GRS planned | Not yet tested |
+| SharePoint Evidence | Managed by Microsoft 365 (tenant's responsibility) | Continuous (SharePoint versioning) | Per tenant's M365 retention policies | Depends on M365 backup | Depends on M365 recovery | Yes (M365 global infrastructure) | N/A (tenant-managed) |
+| Azure Key Vault (kv-cmmc-assessor-prod) | Azure built-in soft delete + purge protection | Continuous | 90 days soft delete retention | 0 | < 5 minutes (undelete) | No (Standard tier, locally redundant) | Not yet tested |
+| Log Analytics (log-cmmc-assessor-prod) | Azure managed | Continuous | 30 days | N/A (operational data) | N/A | Azure-managed redundancy | N/A |
 
 ### 7.2 Recovery Procedures
 
 | Scenario | Procedure | Responsible Team | Estimated Duration |
 |----------|-----------|-----------------|-------------------|
-| Single database corruption | [e.g., Point-in-time restore to new server, verify data, swap connection strings] | [e.g., Platform / DBA team] | [e.g., 1-2 hours] |
-| Full region outage | [e.g., Failover to geo-secondary, update DNS, validate services] | [e.g., Platform / SRE team] | [e.g., 2-4 hours] |
-| Accidental data deletion (blob) | [e.g., Restore from soft-deleted version or previous blob version] | [e.g., Application team] | [e.g., < 30 minutes] |
-| Ransomware / security breach | [e.g., Isolate affected resources, restore from immutable backups, forensics] | [e.g., Security + Platform team] | [e.g., 4-24 hours] |
-| [ADDITIONAL_SCENARIO] | [PROCEDURE] | [RESPONSIBLE_TEAM] | [ESTIMATED_DURATION] |
+| Single table data corruption (PostgreSQL) | Point-in-time restore to a new PostgreSQL server at the moment before corruption; validate restored data; migrate corrected data back to production database | Development Team | 1-2 hours |
+| Full database loss | Point-in-time restore to latest available point; deploy new PostgreSQL Flexible Server via Bicep if needed; update connection string in Key Vault; restart Container Apps | Development Team | 2-4 hours |
+| Accidental blob deletion | Restore from soft-deleted blobs (if soft delete is enabled) or re-upload from SharePoint source | Development Team | < 30 minutes |
+| Key Vault secret compromise | Rotate compromised secret immediately; update dependent services (Container Apps restart); revoke all active JWTs via TokenDenyList if JWT signing key compromised; force re-authentication for all users | Development Team + Security | 1-4 hours |
+| Container App failure / bad deployment | Revert to previous container image tag in Azure Container Registry; redeploy via GitHub Actions or manual Bicep deployment | Development Team | < 30 minutes |
+| Entra ID integration failure | Verify Entra ID app registration; check client secret expiry; re-consent if needed; legacy auth serves as temporary fallback | Development Team | 30 minutes - 2 hours |
 
 ### 7.3 Disaster Recovery Testing
 
 | Aspect | Approach |
 |--------|----------|
-| Test Frequency | [e.g., Full DR test quarterly, tabletop exercise monthly] |
-| Test Scope | [e.g., Rotate between individual store recovery and full region failover] |
-| Success Criteria | [e.g., RPO and RTO targets met, data integrity verified, all services operational] |
-| Documentation | [e.g., DR test results documented in [LINK_TO_DR_TEST_LOG]] |
+| Test Frequency | Not yet established; planned for quarterly once production stabilizes |
+| Test Scope | Initial focus: PostgreSQL PITR test, container redeployment from previous image, Key Vault secret rotation drill |
+| Success Criteria | RPO and RTO targets met; data integrity verified via row counts and spot checks; all API endpoints operational; tenant isolation verified post-recovery |
+| Documentation | DR test results to be documented in Confluence upon completion |
+
+**Note:** DR testing is identified as a gap and is part of the security remediation roadmap. The 7-day backup retention is being increased to 35 days as an early remediation item.
 
 ---
 
 ## 8. Data Migration Strategy
 
-> [OPTIONAL] Include this section if migrating data from a legacy system or performing a major data platform change.
-
 ### 8.1 Migration Overview
 
 | Aspect | Detail |
 |--------|--------|
-| Source System | [e.g., On-premises SQL Server 2016] |
-| Target System | [e.g., Azure Database for PostgreSQL Flexible Server] |
-| Data Volume | [e.g., ~500 GB, 150 tables, 200M rows in largest table] |
-| Migration Approach | [e.g., Phased migration with dual-write period] |
-| Downtime Window | [e.g., Maximum 4 hours for final cutover] |
-| Rollback Plan | [e.g., Revert application to point at source system; source kept read-only during migration] |
+| Source System | Legacy Organization model (within same database) |
+| Target System | New Tenant model (within same database) |
+| Data Volume | Small (< 1,000 organizations to migrate to tenant model) |
+| Migration Approach | In-place migration via Prisma migrations; Organization table retained temporarily for backward compatibility; data copied to Tenant model; references updated |
+| Downtime Window | Zero downtime; expand-and-contract migration pattern |
+| Rollback Plan | Organization table retained; application code can fall back to Organization queries if needed |
 
 ### 8.2 Migration Phases
 
 | Phase | Description | Duration | Validation |
 |-------|-------------|----------|------------|
-| 1. Schema Migration | [e.g., Convert SQL Server schema to PostgreSQL, test with empty DB] | [e.g., 2 weeks] | [e.g., Schema comparison, all migrations run successfully] |
-| 2. Historical Data Migration | [e.g., Bulk load historical data using Azure Data Factory / pg_dump] | [e.g., 1 week] | [e.g., Row counts, checksum validation, sample data verification] |
-| 3. Delta Sync | [e.g., Change data capture (CDC) for incremental sync during transition] | [e.g., 2 weeks parallel run] | [e.g., Continuous row count comparison, data integrity checks] |
-| 4. Cutover | [e.g., Stop source writes, final delta sync, switch application to target] | [e.g., 4-hour window] | [e.g., Full regression test suite, smoke tests, data validation queries] |
-| 5. Post-Migration | [e.g., Monitor for issues, decommission source after 30-day bake period] | [e.g., 30 days] | [e.g., No data discrepancies, performance within SLA] |
-
-### 8.3 Data Transformation Rules
-
-| Source Table/Field | Target Table/Field | Transformation | Notes |
-|-------------------|-------------------|----------------|-------|
-| [SOURCE_TABLE.FIELD] | [TARGET_TABLE.FIELD] | [e.g., NVARCHAR -> TEXT, date format conversion] | [NOTES] |
-| [SOURCE_TABLE.FIELD] | [TARGET_TABLE.FIELD] | [e.g., Split into separate table (normalization)] | [NOTES] |
-| [ADDITIONAL_MAPPING] | [TARGET] | [TRANSFORMATION] | [NOTES] |
+| 1. Schema Expansion | Add Tenant table and TeamMember table via Prisma migration; keep Organization table | 1 sprint | Prisma migration applies cleanly; existing functionality unaffected |
+| 2. Data Copy | Copy Organization data to Tenant; create TeamMember records for existing users | 1 sprint | Row counts match; all users have valid TeamMember entries |
+| 3. Application Cutover | Update all application code to use Tenant/TeamMember instead of Organization | 2-3 sprints | All API endpoints work with tenant-scoped queries; no regression |
+| 4. Schema Contraction | Remove Organization table references; mark Organization as deprecated | 1 sprint | No foreign key references to Organization remain; clean Prisma schema |
 
 ---
 
@@ -229,42 +249,43 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Right | Implementation | Endpoint / Process |
 |-------|---------------|-------------------|
-| Right to Access (Art. 15) | [e.g., Data export API generates JSON/CSV of all user data] | [e.g., GET /api/v1/users/{id}/data-export] |
-| Right to Rectification (Art. 16) | [e.g., Standard user profile update functionality] | [e.g., PUT /api/v1/users/{id}] |
-| Right to Erasure (Art. 17) | [e.g., Anonymization of PII, cascade to all dependent data stores] | [e.g., DELETE /api/v1/users/{id}/personal-data] |
-| Right to Restrict Processing (Art. 18) | [e.g., User status set to "restricted", data retained but not processed] | [e.g., PATCH /api/v1/users/{id}/processing-status] |
-| Right to Data Portability (Art. 20) | [e.g., Machine-readable export (JSON) of user-provided data] | [e.g., GET /api/v1/users/{id}/portable-data] |
-| Right to Object (Art. 21) | [e.g., Opt-out flags for marketing, profiling] | [e.g., PATCH /api/v1/users/{id}/consent-preferences] |
+| Right to Access (Art. 15) | Export all user data including profile, team memberships, objective responses, policy acknowledgments, and audit log entries referencing the user | Manual process currently; planned: GET /api/users/{id}/data-export |
+| Right to Rectification (Art. 16) | User profile update via existing team management and settings endpoints | PUT /api/team/members/:id (name, email updates) |
+| Right to Erasure (Art. 17) | User account deletion with cascade: remove TeamMember records, anonymize AuditLog actor references, delete UserTokens and RefreshTokens; retain assessment data for regulatory compliance with anonymized assessor references | Manual process currently; planned: DELETE /api/users/{id}/personal-data |
+| Right to Restrict Processing (Art. 18) | Set user status to INACTIVE; retain data but prevent login and API access | PATCH user status via admin endpoint |
+| Right to Data Portability (Art. 20) | Export user-provided data (profile, objective responses, policy acknowledgments) in JSON format | Planned: GET /api/users/{id}/portable-data |
+| Right to Object (Art. 21) | No marketing or profiling data is collected; platform is a professional B2B tool | N/A (no marketing data processing) |
 
 ### 9.2 Data Processing Inventory
 
-| Processing Activity | Legal Basis | Data Categories | Data Subjects | Processor | Transfer Outside EU |
-|--------------------|-------------|-----------------|---------------|-----------|---------------------|
-| User account management | Contract (Art. 6(1)(b)) | Name, email, phone | Customers | [PROJECT_NAME] (controller) | [e.g., No] |
-| Order processing | Contract (Art. 6(1)(b)) | Order details, payment info | Customers | [PROJECT_NAME] + [PAYMENT_PROVIDER] | [e.g., No / Yes with SCCs] |
-| Analytics and reporting | Legitimate Interest (Art. 6(1)(f)) | Aggregated usage data | Customers, employees | [ANALYTICS_PROVIDER] | [e.g., No] |
-| Marketing communications | Consent (Art. 6(1)(a)) | Email, preferences | Customers | [EMAIL_PROVIDER] | [e.g., Yes, EU SCCs in place] |
-| [ADDITIONAL_ACTIVITY] | [LEGAL_BASIS] | [DATA_CATEGORIES] | [DATA_SUBJECTS] | [PROCESSOR] | [TRANSFER] |
+| Processing Activity | Legal Basis | Data Categories | Data Subjects | Processor | Transfer Outside Canada |
+|--------------------|-------------|-----------------|---------------|-----------|------------------------|
+| User account management (Entra ID) | Contract (Art. 6(1)(b)) -- necessary for service delivery | Name, email, Entra ID object ID, team role | Assessors, team members, platform admins | CMMC Assessor Platform (controller) | Yes -- Microsoft Entra ID (governed by Microsoft DPA; data processed in Microsoft global infrastructure) |
+| CMMC assessment processing | Contract (Art. 6(1)(b)) -- core service function | Assessment responses, SPRS scores, implementation details, POA&M items | Assessors | CMMC Assessor Platform (controller) | No (all assessment data stored in Canada Central PostgreSQL) |
+| Evidence management (SharePoint) | Contract (Art. 6(1)(b)) | Evidence files (may contain CUI) | Assessors, tenant organizations | Microsoft 365 (processor, governed by tenant's M365 agreement) | Depends on tenant's M365 geography; governed by tenant's own DPA with Microsoft |
+| Audit logging | Legitimate Interest (Art. 6(1)(f)) -- security and compliance monitoring | User actions, IP addresses, entity changes | All authenticated users | CMMC Assessor Platform (controller) | No (stored in Canada Central PostgreSQL) |
+| Application logging | Legitimate Interest (Art. 6(1)(f)) -- operational monitoring | System events, error details (may include user identifiers) | All users (indirectly) | Microsoft Azure (Log Analytics) | No (Log Analytics in Canada Central) |
 
 ### 9.3 Privacy by Design Controls
 
 | Control | Implementation |
 |---------|---------------|
-| Data Minimization | [e.g., Only collect data fields necessary for the stated purpose; review quarterly] |
-| Purpose Limitation | [e.g., Data used only for the purpose declared at collection; enforced via RBAC] |
-| Storage Limitation | [e.g., Automated retention policies with scheduled purge jobs (see Section 6)] |
-| Pseudonymization | [e.g., Internal IDs (UUIDs) used instead of natural keys; PII separated from transactional data] |
-| Consent Management | [e.g., Granular consent tracking per purpose, with timestamp and version of consent text] |
-| Data Protection Impact Assessment (DPIA) | [e.g., DPIA completed for [HIGH_RISK_PROCESSING]; document at [LINK_TO_DPIA]] |
-| Breach Notification Process | [e.g., 72-hour notification to supervisory authority; process documented in [LINK_TO_INCIDENT_RESPONSE]] |
+| Data Minimization | Only collect data necessary for CMMC assessment workflows; no marketing data, no behavioral analytics, no third-party tracking; user profile limited to name, email, and role |
+| Purpose Limitation | All data used exclusively for CMMC assessment, scoring, and compliance reporting; no secondary use or sharing |
+| Storage Limitation | Automated retention policies planned; assessment data retained per CMMC audit trail requirements (7 years); operational data (logs, tokens) subject to shorter retention |
+| Pseudonymization | Internal UUIDs used as primary identifiers; Entra ID object IDs separate from display names; AuditLog references user by ID (not email) |
+| Tenant Data Isolation | Every database query scoped to authenticated tenant via Prisma middleware (tenantAuth.ts); no cross-tenant data access possible through application layer |
+| Encryption at Rest | PostgreSQL Transparent Data Encryption (Azure-managed); Azure Storage Service Encryption; Key Vault HSM-backed key storage; Application-layer AES-256-GCM for Graph API tokens |
+| Encryption in Transit | TLS 1.2+ enforced on all connections: browser-to-API, API-to-database (sslmode=require), API-to-Graph API, API-to-Key Vault |
+| Breach Notification Process | Not yet formalized; planned as part of security remediation; target: 72-hour notification to supervisory authority per GDPR Art. 33 |
 
 ### 9.4 Cross-Border Data Transfer
 
 | Destination | Mechanism | Data Categories | Safeguards |
 |-------------|-----------|-----------------|------------|
-| [e.g., United States (GitHub)] | [e.g., EU SCCs + DPA] | [e.g., Source code (no PII)] | [e.g., Encryption in transit, access controls] |
-| [e.g., United States (monitoring provider)] | [e.g., EU SCCs + DPA] | [e.g., Telemetry data (anonymized)] | [e.g., No PII in telemetry, data anonymized before export] |
-| [ADDITIONAL_DESTINATION] | [MECHANISM] | [DATA_CATEGORIES] | [SAFEGUARDS] |
+| Microsoft Entra ID (Global) | Microsoft Data Protection Agreement (DPA) | User identity data (email, name, Entra ID object ID) | Encrypted in transit; Microsoft contractual commitments per DPA; no CUI transferred to Entra ID |
+| Microsoft Graph API / SharePoint (Tenant's M365 geography) | Tenant's own M365 DPA | Evidence files (may contain CUI) | Governed by tenant's own Microsoft 365 agreement; evidence management is opt-in; tenants control their SharePoint data residency |
+| GitHub (United States) | GitHub Enterprise DPA | Source code, CI/CD configuration (no PII, no CUI, no customer data) | No customer data in source code; CI/CD uses OIDC federation (no stored secrets); Docker images contain only application code |
 
 ---
 
@@ -272,5 +293,4 @@ This document defines the data architecture for **[PROJECT_NAME]**. It covers al
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 0.1 | [YYYY-MM-DD] | [AUTHOR] | Initial draft |
-| [VERSION] | [YYYY-MM-DD] | [AUTHOR] | [CHANGES] |
+| 0.1 | 2026-02-14 | Solution Architect | Initial draft |

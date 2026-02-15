@@ -2,18 +2,31 @@
 
 | **Page Title**   | Unit Testing Standards and Guidelines      |
 |------------------|--------------------------------------------|
-| **Last Updated** | [YYYY-MM-DD]                               |
-| **Status**       | [Draft / In Review / Approved / Deprecated] |
-| **Owner**        | [TEAM OR INDIVIDUAL NAME]                  |
+| **Last Updated** | 2026-02-14                                 |
+| **Status**       | Draft                                      |
+| **Owner**        | IntelliSecOps Development Team             |
 
 ---
 
-## 1. Unit Test Standards and Conventions
+## 1. Current State
+
+Unit testing for the CMMC Assessor Platform is **not yet implemented**. The CI pipeline runs `npm test` for both backend and frontend, but no dedicated test suites exist. This document defines the standards, conventions, and planned approach for unit testing.
+
+### What Needs to Be Done
+
+1. Install and configure Jest for both `backend/` and `frontend/` projects.
+2. Write unit tests for existing business logic (assessment scoring, CMMC control mapping, authentication, authorization).
+3. Configure code coverage collection and reporting.
+4. Set up coverage gates in CI to block PRs that drop below thresholds.
+
+---
+
+## 2. Unit Test Standards and Conventions
 
 ### Core Principles
 
 - **Isolated:** Each test verifies a single unit of behavior with all external dependencies mocked or stubbed.
-- **Fast:** Individual unit tests should complete in milliseconds. The full unit test suite should run in under [TARGET-MINUTES] minutes.
+- **Fast:** Individual unit tests should complete in milliseconds. The full unit test suite should run in under 3 minutes.
 - **Deterministic:** Tests produce the same result every time, regardless of execution order, environment, or system clock.
 - **Self-documenting:** Test names clearly describe the scenario and expected outcome.
 - **Independent:** No test depends on the state left by another test. Each test sets up and tears down its own state.
@@ -22,264 +35,266 @@
 
 | Included                                   | Excluded (integration or higher)               |
 |--------------------------------------------|-------------------------------------------------|
-| Business logic in services/handlers        | Database queries against a real database        |
-| Data transformation and mapping            | HTTP calls to external services                  |
-| Validation rules                           | File system I/O                                  |
-| State machine transitions                  | Message broker publish/subscribe                 |
-| Utility/helper functions                   | Tests requiring Docker or Testcontainers         |
-| In-memory repository implementations       | Multi-service orchestration                      |
+| Business logic in services/handlers        | Database queries against real PostgreSQL         |
+| CMMC assessment scoring algorithms         | HTTP calls to external services                  |
+| Data transformation and mapping            | Prisma ORM calls against a real database         |
+| Validation rules (input validation)        | File system I/O                                  |
+| Authentication/authorization logic         | Tests requiring Docker or Testcontainers         |
+| Utility/helper functions                   | Multi-service orchestration                      |
+| React component rendering (shallow)        | Full browser rendering (use Playwright for E2E)  |
 
 ---
 
-## 2. Framework and Tooling by Language
+## 3. Framework and Tooling
 
 | Language / Runtime  | Test Framework      | Assertion Library     | Mocking Library         | Test Runner              |
 |---------------------|---------------------|-----------------------|-------------------------|--------------------------|
-| **.NET (C#)**       | xUnit               | FluentAssertions      | Moq / NSubstitute       | `dotnet test`            |
-| **Node.js / TS**    | Jest                 | Jest built-in         | Jest mocks / ts-mockito | `npm test` / `jest`      |
-| **Python**          | pytest               | pytest built-in / assertpy | unittest.mock / pytest-mock | `pytest`          |
-| **Go**              | testing (stdlib)     | testify               | gomock / testify mock    | `go test`                |
-| [ADD MORE AS NEEDED]|                     |                       |                         |                          |
+| **Backend (Node.js/TS)** | Jest            | Jest built-in (`expect`) | Jest mocks (`jest.fn()`, `jest.mock()`) | `npm test` / `jest` |
+| **Frontend (React/TS)**  | Jest + React Testing Library | Jest built-in + RTL queries | Jest mocks + MSW (Mock Service Worker) | `npm test` / `jest` |
+
+### Why Jest
+
+- Native TypeScript support via `ts-jest` or SWC transform.
+- Built-in mocking, assertion, and coverage capabilities.
+- Widely adopted in the Node.js/React ecosystem.
+- Parallel test execution out of the box.
+- Compatible with the existing `npm test` script in CI.
 
 ---
 
-## 3. Coverage Requirements
+## 4. Coverage Requirements (Planned)
 
 | Metric                    | Minimum Threshold | Enforcement                                            |
 |---------------------------|-------------------|--------------------------------------------------------|
-| **Overall line coverage** | [MIN]%            | Build fails if below threshold                         |
-| **New code line coverage**| [MIN]%            | PR check fails (via [Codecov/SonarCloud]) if below     |
-| **Branch coverage**       | [MIN]%            | Reported; advisory (or enforced if team agrees)        |
-| **Critical path coverage**| [MIN]%            | Higher threshold for modules in `[CRITICAL-PATHS]`     |
+| **Overall line coverage** | 70%               | Build fails if below threshold (planned)               |
+| **New code line coverage**| 80%               | PR check fails via Codecov if below (planned)          |
+| **Branch coverage**       | 60%               | Reported; advisory (planned)                           |
+| **Critical path coverage**| 85%               | Higher threshold for `auth/`, `assessment/`, `api/routes/` modules (planned) |
 
-### Enforcement Mechanism
+### Enforcement Mechanism (Planned)
 
-- Coverage is collected during the `dotnet test` / `npm test` / `pytest` step in GitHub Actions.
-- Coverage reports are uploaded to [Codecov / SonarCloud / Coveralls].
-- A GitHub status check blocks PR merge if coverage drops below the minimum threshold.
-- Coverage trends are visible on the [Codecov / SonarCloud] dashboard: [DASHBOARD-URL].
+- Coverage will be collected during `npm test` using Jest's built-in `--coverage` flag.
+- Coverage reports will be uploaded to Codecov.
+- A GitHub status check will block PR merge if coverage drops below the minimum threshold.
+- Coverage trends will be visible on the Codecov dashboard.
 
 ---
 
-## 4. Mocking Strategy
+## 5. Mocking Strategy
 
 ### What to Mock
 
 | Dependency Type             | Mock?  | Approach                                              |
 |-----------------------------|--------|-------------------------------------------------------|
-| External HTTP services      | Yes    | Mock the HTTP client or use a fake implementation     |
-| Database repositories       | Yes    | Mock the repository interface; use in-memory fakes    |
-| File system access          | Yes    | Abstract behind an interface; mock the interface      |
-| System clock / `DateTime`   | Yes    | Inject a clock abstraction; control time in tests     |
-| Message broker (publish)    | Yes    | Mock the publisher interface                          |
-| Configuration / settings    | Depends| Use in-memory configuration with test values          |
-| Logging                     | No     | Use a real logger (null logger or test logger sink)   |
+| Prisma Client (database)    | Yes    | Mock the Prisma client methods using `jest.mock()`    |
+| External HTTP services      | Yes    | Mock `fetch` / `axios` or use MSW for API mocking     |
+| Microsoft Entra ID (auth)   | Yes    | Mock the authentication middleware and token validation|
+| File system access          | Yes    | Mock `fs` module                                      |
+| System clock / `Date`       | Yes    | Use `jest.useFakeTimers()` to control time in tests   |
+| Environment variables       | Depends| Use `process.env` overrides in test setup             |
+| Logging                     | No     | Use real logger (or silence with `jest.spyOn`)        |
 | Pure utility functions      | No     | Call the real implementation                          |
-
-### Preferred Mocking Libraries
-
-| Language    | Library                  | Notes                                              |
-|-------------|--------------------------|----------------------------------------------------|
-| .NET        | Moq / NSubstitute        | Use `NSubstitute` for cleaner syntax; `Moq` for wider adoption |
-| Node.js/TS  | Jest mocks (`jest.fn()`) | Prefer manual mocks in `__mocks__/` for complex dependencies |
-| Python      | `unittest.mock` / `pytest-mock` | Use `patch` decorators for clean setup/teardown |
+| React Router                | Yes    | Wrap components in `MemoryRouter` for testing         |
 
 ### Anti-Patterns to Avoid
 
 - Mocking the system under test (SUT) itself.
 - Over-mocking: if a test mocks everything, it tests nothing.
-- Mocking value objects or DTOs — use real instances.
+- Mocking value objects or DTOs -- use real instances.
 - Verifying internal implementation details (e.g., exact call counts) unless behavior depends on it.
+- Testing implementation details of React components instead of user-visible behavior.
 
 ---
 
-## 5. Test Naming Conventions
+## 6. Test Naming Conventions
 
-Use a consistent naming pattern that communicates **what** is being tested, **under what conditions**, and **what the expected outcome** is.
+> **Chosen pattern for this project:** `describe`/`it` blocks with `Should_ExpectedBehavior_When_Condition` style.
 
-### Recommended Patterns
+### Example (Backend)
 
-**Pattern 1 — Method_Scenario_ExpectedResult:**
+```typescript
+describe('AssessmentScoringService', () => {
+  describe('calculateScore', () => {
+    it('should return 100% when all controls are fully implemented', () => {
+      // Arrange, Act, Assert
+    });
+
+    it('should return 0% when no controls are implemented', () => {
+      // Arrange, Act, Assert
+    });
+
+    it('should throw ValidationError when assessment ID is invalid', () => {
+      // Arrange, Act, Assert
+    });
+  });
+});
 ```
-CalculateDiscount_WhenOrderExceeds100_Returns10PercentDiscount
-```
 
-**Pattern 2 — Should_ExpectedBehavior_When_Condition:**
-```
-Should_ReturnNotFound_When_UserDoesNotExist
-```
+### Example (Frontend)
 
-**Pattern 3 — Given_When_Then (BDD-style):**
-```
-GivenExpiredToken_WhenAuthenticating_ThenThrowsUnauthorizedException
-```
+```typescript
+describe('AssessmentDashboard', () => {
+  it('should display the overall CMMC score when data is loaded', () => {
+    // Arrange, Act, Assert using React Testing Library
+  });
 
-**Choose one pattern per project and apply it consistently.** Document the chosen pattern here:
+  it('should show a loading spinner while fetching assessment data', () => {
+    // Arrange, Act, Assert
+  });
 
-> **Chosen pattern for this project:** [PATTERN-NAME]
+  it('should display an error message when the API call fails', () => {
+    // Arrange, Act, Assert
+  });
+});
+```
 
 ### General Naming Rules
 
 - Use descriptive names; avoid abbreviations.
-- Do not prefix test names with `Test_` (the framework already identifies them).
-- Group related tests using nested classes or describe blocks.
+- Do not prefix test names with `Test_` (Jest identifies them via `it`/`test` blocks).
+- Group related tests using `describe` blocks that mirror the module structure.
 
 ---
 
-## 6. Test Organization / Folder Structure
+## 7. Test Organization / Folder Structure
 
-### .NET Example
-
-```
-src/
-  OrderService/
-    Services/
-      OrderCalculator.cs
-    Models/
-      Order.cs
-tests/
-  OrderService.UnitTests/
-    Services/
-      OrderCalculatorTests.cs
-    Models/
-      OrderTests.cs
-    Fakes/
-      FakeOrderRepository.cs
-    Builders/
-      OrderBuilder.cs
-```
-
-### Node.js / TypeScript Example
+### Backend (Planned)
 
 ```
-src/
-  services/
-    orderCalculator.ts
-  models/
-    order.ts
-tests/
-  unit/
+backend/
+  src/
     services/
-      orderCalculator.test.ts
-    models/
-      order.test.ts
-  __mocks__/
-    orderRepository.ts
-  factories/
-    orderFactory.ts
+      assessmentService.ts
+      authService.ts
+    routes/
+      assessmentRoutes.ts
+    utils/
+      scoring.ts
+  tests/
+    unit/
+      services/
+        assessmentService.test.ts
+        authService.test.ts
+      routes/
+        assessmentRoutes.test.ts
+      utils/
+        scoring.test.ts
+    __mocks__/
+      prismaClient.ts
+    factories/
+      assessmentFactory.ts
+      userFactory.ts
+  jest.config.ts
 ```
 
-### Python Example
+### Frontend (Planned)
 
 ```
-src/
-  order_service/
+frontend/
+  src/
+    components/
+      AssessmentDashboard.tsx
+      ControlChecklist.tsx
+    hooks/
+      useAssessment.ts
     services/
-      order_calculator.py
-    models/
-      order.py
-tests/
-  unit/
-    services/
-      test_order_calculator.py
-    models/
-      test_order.py
-  conftest.py
-  factories/
-    order_factory.py
+      api.ts
+  tests/
+    unit/
+      components/
+        AssessmentDashboard.test.tsx
+        ControlChecklist.test.tsx
+      hooks/
+        useAssessment.test.ts
+      services/
+        api.test.ts
+    __mocks__/
+      api.ts
+    factories/
+      assessmentFactory.ts
+  jest.config.ts
 ```
 
 ### Conventions
 
-- Mirror the source folder structure in the test project.
-- Place shared test utilities (builders, factories, fakes) in a clearly named subfolder.
+- Mirror the source folder structure in the test directory.
+- Place shared test utilities (factories, mocks) in clearly named subfolders.
 - One test file per source file.
+- Test files use the `.test.ts` or `.test.tsx` extension.
 
 ---
 
-## 7. CI Integration (GitHub Actions)
+## 8. CI Integration (GitHub Actions)
 
-Unit tests run as part of every build workflow. See [Build Pipeline](../05-cicd-pipeline/build-pipeline.md) for the full workflow.
+Unit tests will run as part of the existing CI workflow. The `npm test` command in both `backend-ci` and `frontend-ci` jobs already executes; once Jest is configured, tests will run automatically.
 
-### Unit Test Step in GitHub Actions
+### Planned Unit Test Step in GitHub Actions
 
 ```yaml
-- name: Run unit tests
-  run: |
-    dotnet test tests/[PROJECT].UnitTests \
-      --configuration Release \
-      --no-build \
-      --logger "trx;LogFileName=unit-test-results.trx" \
-      --collect:"XPlat Code Coverage" \
-      -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
-
-- name: Publish test results
-  uses: dorny/test-reporter@v1
-  if: always()
-  with:
-    name: Unit Test Results
-    path: '**/unit-test-results.trx'
-    reporter: dotnet-trx
+# In backend-ci job:
+- name: Run unit tests with coverage
+  run: npm test -- --coverage --ci --reporters=default --reporters=jest-junit
+  env:
+    JEST_JUNIT_OUTPUT_DIR: ./reports
+    JEST_JUNIT_OUTPUT_NAME: junit.xml
 
 - name: Upload coverage to Codecov
   uses: codecov/codecov-action@v4
   with:
-    files: '**/coverage.cobertura.xml'
-    flags: unittests
+    files: ./coverage/lcov.info
+    flags: backend-unit
     fail_ci_if_error: true
     token: ${{ secrets.CODECOV_TOKEN }}
 ```
 
-### PR Integration
+### PR Integration (Planned)
 
-- Test results appear as a check on the pull request.
-- Coverage diff is posted as a PR comment by [Codecov / SonarCloud].
+- Test results will appear as a check on the pull request.
+- Coverage diff will be posted as a PR comment by Codecov.
 - PR cannot be merged if unit tests fail or coverage drops below the minimum threshold.
 
 ---
 
-## 8. Coverage Reporting
+## 9. Coverage Reporting (Planned)
 
 | Aspect                  | Configuration                                   |
 |-------------------------|-------------------------------------------------|
-| **Collection tool**     | [Coverlet (.NET) / Istanbul-nyc (Node) / coverage.py (Python)] |
-| **Report format**       | Cobertura XML                                   |
-| **Reporting platform**  | [Codecov / SonarCloud / Coveralls]              |
-| **Dashboard URL**       | [DASHBOARD-URL]                                 |
-| **PR decoration**       | Automatic comment with coverage diff            |
-| **Historical trends**   | Available on [PLATFORM] dashboard               |
+| **Collection tool**     | Jest built-in coverage (`--coverage`)            |
+| **Report format**       | lcov + JSON summary                             |
+| **Reporting platform**  | Codecov (planned)                               |
+| **Dashboard URL**       | TBD (once Codecov is configured)                |
+| **PR decoration**       | Automatic comment with coverage diff (planned)  |
+| **Historical trends**   | Available on Codecov dashboard (planned)        |
 
 ---
 
-## 9. Current Coverage Metrics
+## 10. Current Coverage Metrics
 
-> Update this table periodically (at least once per sprint) or link to a live dashboard.
+> No coverage data is available yet. This table will be populated once unit tests are implemented.
 
 | Component / Service         | Current Coverage % | Target % | Trend (vs last sprint)  | Notes                         |
 |-----------------------------|--------------------|----------|-------------------------|-------------------------------|
-| [SERVICE-1]                 | [CURRENT]%         | [TARGET]%| [UP/DOWN/STABLE]        |                               |
-| [SERVICE-2]                 | [CURRENT]%         | [TARGET]%| [UP/DOWN/STABLE]        |                               |
-| [SERVICE-3]                 | [CURRENT]%         | [TARGET]%| [UP/DOWN/STABLE]        |                               |
-| [SHARED-LIBRARY]            | [CURRENT]%         | [TARGET]%| [UP/DOWN/STABLE]        |                               |
-| **Overall**                 | **[CURRENT]%**     | **[TARGET]%** | **[TREND]**        |                               |
+| Backend                     | 0% (no tests)     | 70%      | N/A                     | Tests not yet implemented     |
+| Frontend                    | 0% (no tests)     | 70%      | N/A                     | Tests not yet implemented     |
+| **Overall**                 | **0%**             | **70%**  | **N/A**                 |                               |
 
 ---
 
-## 10. Best Practices Checklist
+## 11. Best Practices Checklist
 
 - [ ] Each test tests one behavior (single assertion or closely related assertions).
 - [ ] Tests follow the Arrange-Act-Assert (AAA) pattern.
 - [ ] No test relies on another test's execution or side effects.
-- [ ] External dependencies are mocked via interfaces.
-- [ ] Test data is created using builders or factories, not hard-coded literals.
+- [ ] External dependencies are mocked via Jest mocks.
+- [ ] Test data is created using factories, not hard-coded literals.
 - [ ] Flaky tests are immediately flagged, investigated, and fixed or quarantined.
-- [ ] Parameterized tests are used for multiple input/output scenarios.
-- [ ] Tests run in parallel where the framework supports it.
+- [ ] Parameterized tests (`test.each`) are used for multiple input/output scenarios.
+- [ ] Tests run in parallel where Jest supports it (default behavior).
 - [ ] Test files are code-reviewed with the same rigor as production code.
 
 ---
 
-## 11. Appendix
+## 12. Appendix
 
 ### Related Pages
 

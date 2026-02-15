@@ -2,11 +2,11 @@
 
 | **Metadata**     | **Value**                                      |
 |------------------|------------------------------------------------|
-| Page Title       | [PROJECT_NAME] - Architecture Decision Records |
-| Last Updated     | [YYYY-MM-DD]                                   |
-| Status           | `DRAFT` / `IN REVIEW` / `APPROVED`             |
-| Owner            | [OWNER_NAME]                                   |
-| Reviewers        | [REVIEWER_1], [REVIEWER_2], [REVIEWER_3]       |
+| Page Title       | CMMC Assessor Platform - Architecture Decision Records |
+| Last Updated     | 2026-02-14                                     |
+| Status           | `DRAFT`                                        |
+| Owner            | Solution Architect                             |
+| Reviewers        | Technical Lead, Security Architect, Engineering Manager |
 
 ---
 
@@ -14,9 +14,9 @@
 
 | ADR # | Title | Status | Date | Decision Maker |
 |-------|-------|--------|------|----------------|
-| ADR-001 | Use AKS for Container Orchestration | Accepted | 2026-01-10 | [SOLUTION_ARCHITECT] |
-| ADR-002 | Use GitHub Actions over Azure DevOps Pipelines | Accepted | 2026-01-12 | [SOLUTION_ARCHITECT] |
-| [ADR-NNN] | [TITLE] | [STATUS] | [DATE] | [DECISION_MAKER] |
+| ADR-001 | Use Azure Container Apps over AKS for Container Hosting | Accepted | 2026-01-15 | Solution Architect |
+| ADR-002 | Use Prisma ORM over Raw SQL for Database Access | Accepted | 2026-01-18 | Solution Architect |
+| ADR-003 | Use Microsoft Entra ID over Custom Authentication | Accepted | 2026-01-10 | Solution Architect |
 
 ---
 
@@ -113,49 +113,48 @@
 
 ---
 
-# Example ADR-001: Use AKS for Container Orchestration
+# ADR-001: Use Azure Container Apps over AKS for Container Hosting
 
-## ADR-001: Use Azure Kubernetes Service (AKS) for Container Orchestration
+## ADR-001: Use Azure Container Apps (ACA) over Azure Kubernetes Service (AKS)
 
 | **Field**        | **Value**                                                |
 |------------------|----------------------------------------------------------|
 | ADR Number       | ADR-001                                                  |
-| Title            | Use Azure Kubernetes Service (AKS) for Container Orchestration |
-| Date             | 2026-01-10                                               |
+| Title            | Use Azure Container Apps over AKS for Container Hosting  |
+| Date             | 2026-01-15                                               |
 | Status           | `Accepted`                                               |
-| Decision Maker   | Jane Smith, Solution Architect                           |
-| Consulted        | Platform Engineering Team, DevOps Lead, Security Architect |
-| Informed         | Engineering Manager, Product Owner, All Development Teams |
+| Decision Maker   | Solution Architect                                       |
+| Consulted        | Technical Lead, DevOps Engineer                          |
+| Informed         | Engineering Manager, Product Owner, Development Team     |
 
 ---
 
 ### Context
 
-The project requires a container orchestration platform to host 8-12 microservices that form the core backend of the solution. These services are developed by three teams, deployed independently, and must support auto-scaling to handle variable traffic patterns (baseline of 1,000 concurrent users scaling to 10,000 during peak events).
+The CMMC Assessor Platform requires a container hosting solution on Microsoft Azure to run two containerized workloads: a Node.js/Express backend API and an Nginx-served React frontend. The platform is an MVP with the following characteristics:
 
-The organization has standardized on Microsoft Azure as the cloud provider. The team has moderate Kubernetes experience (2 out of 5 engineers have production K8s experience). The existing CI/CD pipeline uses GitHub Actions. The solution must support blue-green or canary deployments, and services need to communicate via both synchronous REST calls and asynchronous messaging through Azure Service Bus.
+- **Small team**: 1-3 developers with limited DevOps bandwidth
+- **Low traffic**: Expected peak of < 50 concurrent users in Year 1
+- **Cost sensitivity**: MVP budget requires minimal infrastructure spend; the platform should cost as little as possible when idle
+- **Deployment simplicity**: The team needs fast, straightforward deployments without managing cluster infrastructure
+- **Two containers only**: No microservices architecture; just a frontend and backend container
+- **No complex networking**: No service mesh, sidecar patterns, or multi-cluster requirements
+- **Scale-to-zero**: The platform will have periods of zero usage (e.g., nights, weekends) and should not incur costs during idle time
 
-Key requirements:
-- Auto-scaling based on CPU, memory, and custom metrics (queue depth)
-- Support for rolling updates with zero-downtime deployments
-- Integration with Azure Managed Identity for secret-less authentication
-- Network isolation via Azure Virtual Network
-- Cost-effective for the expected workload profile
+The team evaluated Azure Kubernetes Service (AKS), Azure Container Apps (ACA), and Azure App Service for Containers as hosting options.
 
 ---
 
 ### Decision
 
-We will use **Azure Kubernetes Service (AKS)** as the container orchestration platform for all microservices.
+We will use **Azure Container Apps (ACA)** in Consumption mode as the container hosting platform for both the backend API (cmmc-api) and frontend SPA (cmmc-web).
 
 Specific configuration:
-- AKS cluster version: 1.29 (latest stable at time of decision)
-- Node pools: System pool (Standard_D2s_v5, 2 nodes) + User pool (Standard_D4s_v5, 3-20 nodes with cluster autoscaler)
-- Networking: Azure CNI Overlay with Calico network policies
-- Ingress: NGINX Ingress Controller with Azure-managed TLS certificates
-- Identity: Workload Identity federation for pod-level Managed Identity
-- GitOps: Flux v2 for cluster configuration management
-- Monitoring: Azure Monitor Container Insights + Prometheus/Grafana stack
+- **Container Apps Environment**: cae-cmmc-assessor-prod (Consumption plan, Canada Central)
+- **Backend (cmmc-api)**: 0.5 CPU, 1Gi memory, 0-3 replicas, auto-scale on HTTP concurrency (threshold: 50), Single Active Revision mode
+- **Frontend (cmmc-web)**: 0.25 CPU, 0.5Gi memory, 0-3 replicas, auto-scale on HTTP concurrency (threshold: 100), Single Active Revision mode
+- **Ingress**: Built-in HTTPS ingress with Azure-managed TLS certificates
+- **Deployment**: Container images pushed to Azure Container Registry (acrcmmcassessorprod); deployed via GitHub Actions with Bicep IaC
 
 ---
 
@@ -163,30 +162,30 @@ Specific configuration:
 
 | # | Option | Pros | Cons |
 |---|--------|------|------|
-| 1 | **Azure Kubernetes Service (AKS)** -- chosen | Mature managed K8s; full control over networking, scaling, and deployment strategies; strong Azure integration (Managed Identity, VNet, Monitor); large community and ecosystem; supports complex topologies (sidecars, init containers, CronJobs); team has some K8s experience | Higher operational complexity than PaaS; requires K8s expertise for cluster management; more YAML configuration; longer initial setup time |
-| 2 | **Azure Container Apps (ACA)** | Serverless containers, simpler operations; built-in Dapr integration; scale-to-zero; faster time to first deployment; less operational overhead | Less control over networking and scaling; limited support for complex deployment patterns; newer service with fewer enterprise case studies; cannot run sidecar patterns easily (at time of decision); limited ingress customization |
-| 3 | **Azure App Service (Containers)** | Simplest operational model; built-in deployment slots for blue-green; no container orchestration knowledge needed; easy auto-scaling | Limited to single-container deployments; no service mesh support; less flexible networking; harder to manage 10+ independent services; higher per-unit cost at scale |
+| 1 | **Azure Container Apps (ACA)** -- chosen | Scale-to-zero eliminates idle costs; Consumption pricing (pay per request/CPU-second); built-in HTTPS ingress with auto TLS; no cluster management overhead; built-in auto-scaling; Bicep-native deployment; simple revision management; logs stream to Log Analytics automatically; fastest time-to-production | Less control over networking (no VNet integration in Consumption plan without add-on); limited to HTTP-based scaling triggers in basic mode; fewer deployment strategies (no canary/blue-green natively, though traffic splitting exists); newer service with smaller community compared to AKS |
+| 2 | **Azure Kubernetes Service (AKS)** | Full Kubernetes control; mature ecosystem with extensive tooling (Helm, Flux, ArgoCD); complex deployment strategies (canary, blue-green via Flagger); service mesh support; VNet integration; granular network policies; large community; portable to other clouds | Significant operational overhead for a 2-container deployment; requires Kubernetes expertise; no scale-to-zero (minimum 1 system node always running); higher base cost (~$70-150/month for smallest cluster); cluster upgrades, node pool management, and security patching required; overkill for current requirements |
+| 3 | **Azure App Service for Containers** | Simplest deployment model; built-in deployment slots for blue-green; auto-scaling; managed TLS; no orchestration knowledge needed | No scale-to-zero (always-on pricing); higher per-unit cost at scale; limited to single-container per app (no sidecar support); less flexible configuration; each container needs its own App Service Plan or shared plan |
 
 ---
 
 ### Consequences
 
 **What becomes easier or better:**
-- Full control over deployment strategies (canary, blue-green via Flagger or Argo Rollouts)
-- Consistent environment across development, staging, and production using Helm charts
-- Ability to run complex workloads: CronJobs, init containers, sidecar proxies
-- Strong ecosystem of tools for monitoring, security scanning (Trivy, Falco), and policy enforcement (OPA Gatekeeper)
-- Future portability if multi-cloud becomes a requirement
+- Zero idle cost: containers scale to zero during periods of no traffic, dramatically reducing MVP infrastructure costs
+- No cluster management: no Kubernetes version upgrades, node pool sizing, or security patching required
+- Faster deployments: push image to ACR, update Container App revision via Bicep -- no Helm charts, no kubectl, no manifests
+- Simpler monitoring: logs automatically streamed to Log Analytics without configuring Container Insights or Prometheus
+- Lower cognitive overhead: team can focus on application development rather than infrastructure operations
 
 **What becomes harder or worse:**
-- Higher learning curve for team members without Kubernetes experience (2-3 week ramp-up estimated)
-- Cluster lifecycle management (upgrades, node pool management, patching) requires dedicated platform engineering effort
-- More YAML/Helm template management compared to PaaS alternatives
-- Cost optimization requires careful node pool sizing and autoscaler tuning
+- Limited deployment strategies: no native canary or blue-green deployments (traffic splitting between revisions is available but more basic than Kubernetes-native options)
+- Less networking control: cannot easily add VNet integration, private endpoints, or network policies in basic Consumption plan (Workload profiles plan adds this at higher cost)
+- Cold start latency: scale-from-zero introduces 5-15 seconds of cold start when the first request arrives after idle period
+- If the platform outgrows ACA (e.g., 10+ microservices, complex networking, service mesh needs), migration to AKS would be required
 
 **Risks:**
-- Team Kubernetes skill gap: Mitigated by scheduled training sessions (Azure AKS workshop), pair programming with experienced engineers, and adopting Flux for GitOps to reduce manual kubectl operations
-- Cluster misconfiguration leading to security issues: Mitigated by Azure Policy for AKS, OPA Gatekeeper policies, and pre-commit Helm chart validation in CI pipeline
+- Cold start latency degrading user experience: Mitigated by keeping minimum replicas at 0 (acceptable for MVP); can increase to min=1 in production if cold start becomes a problem (at the cost of eliminating scale-to-zero savings)
+- ACA feature limitations blocking future requirements: Mitigated by the fact that ACA is rapidly maturing; Workload profiles plan provides VNet integration and dedicated compute if needed; migration to AKS is a well-documented path
 
 ---
 
@@ -194,19 +193,19 @@ Specific configuration:
 
 | Aspect | Implication | Mitigation |
 |--------|------------|------------|
-| Network Isolation | AKS nodes must be in a private VNet; API server can be publicly or privately accessible | Deploy with private cluster mode; use Azure Bastion or VPN for admin access |
-| Identity and Access | Pods need Azure resource access without storing secrets | Use AKS Workload Identity with Entra ID federated credentials |
-| Image Security | Container images could contain vulnerabilities | Enable Microsoft Defender for Containers; scan images in CI with Trivy; allow only signed images from private ACR |
-| Regulatory (SOC 2) | Cluster configuration and access must be auditable | Enable AKS diagnostic logging to Log Analytics; use Azure RBAC for cluster access; enforce Kubernetes RBAC |
+| Data Residency | Container Apps Environment must be in Canada Central for data residency compliance | cae-cmmc-assessor-prod deployed to Canada Central region |
+| Network Isolation | Consumption plan has limited VNet integration; containers are accessible via public ingress | Application-level security via JWT authentication, tenant isolation middleware, rate limiting, and CORS; Workload profiles plan available if VNet isolation required |
+| TLS Termination | TLS is terminated at the Container Apps ingress; traffic between ingress and container is HTTP | Acceptable for current security posture; container runs in Azure-managed infrastructure; no sensitive data exposed between ingress and container within the same environment |
+| Container Image Security | Container images could contain vulnerabilities | Docker images built from official Node.js and Nginx base images; GitHub Actions CI can be extended with vulnerability scanning (Trivy); images stored in private ACR |
 
 ---
 
 ### References
 
-- [Azure Kubernetes Service documentation](https://learn.microsoft.com/en-us/azure/aks/)
-- [AKS baseline architecture (Azure Architecture Center)](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks)
-- [AKS Workload Identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview)
-- Internal: Platform Engineering team's AKS standards document (Confluence: [LINK])
+- [Azure Container Apps documentation](https://learn.microsoft.com/en-us/azure/container-apps/)
+- [Azure Container Apps pricing](https://azure.microsoft.com/en-us/pricing/details/container-apps/)
+- [Azure Container Apps vs AKS comparison](https://learn.microsoft.com/en-us/azure/container-apps/compare-options)
+- [Container Apps scaling rules](https://learn.microsoft.com/en-us/azure/container-apps/scale-app)
 
 ---
 
@@ -214,61 +213,54 @@ Specific configuration:
 
 | Role | Name | Date | Decision |
 |------|------|------|----------|
-| Solution Architect | Jane Smith | 2026-01-10 | [x] Approve |
-| Technical Lead | Bob Johnson | 2026-01-11 | [x] Approve |
-| Security Architect | Alice Chen | 2026-01-12 | [x] Approve |
-| Engineering Manager | David Park | 2026-01-12 | [x] Approve |
+| Solution Architect | ___________________ | 2026-01-15 | [x] Approve |
+| Technical Lead | ___________________ | 2026-01-16 | [x] Approve |
+| Engineering Manager | ___________________ | 2026-01-16 | [x] Approve |
 
 ---
 
 ---
 
-# Example ADR-002: Use GitHub Actions over Azure DevOps Pipelines
+# ADR-002: Use Prisma ORM over Raw SQL for Database Access
 
-## ADR-002: Use GitHub Actions for CI/CD over Azure DevOps Pipelines
+## ADR-002: Use Prisma ORM over Raw SQL for Database Access
 
 | **Field**        | **Value**                                                |
 |------------------|----------------------------------------------------------|
 | ADR Number       | ADR-002                                                  |
-| Title            | Use GitHub Actions for CI/CD over Azure DevOps Pipelines |
-| Date             | 2026-01-12                                               |
+| Title            | Use Prisma ORM over Raw SQL for Database Access          |
+| Date             | 2026-01-18                                               |
 | Status           | `Accepted`                                               |
-| Decision Maker   | Jane Smith, Solution Architect                           |
-| Consulted        | DevOps Lead, Engineering Manager, Security Architect     |
-| Informed         | All Development Teams, Platform Engineering              |
+| Decision Maker   | Solution Architect                                       |
+| Consulted        | Technical Lead, Backend Developer                        |
+| Informed         | Development Team, Engineering Manager                    |
 
 ---
 
 ### Context
 
-The project requires a CI/CD platform to automate building, testing, and deploying all application components (microservices in AKS, Azure Functions, App Service apps, and IaC via Terraform/Bicep). The CI/CD system must support:
+The CMMC Assessor Platform uses PostgreSQL 17 as its relational database with 22 tables covering tenants, users, assessments, controls, objectives, responses, POA&Ms, policies, audit logs, and token management. The application requires:
 
-- Multi-stage pipelines (build -> test -> deploy to dev -> staging -> production)
-- Approval gates for production deployments
-- Integration with Azure for deployments (OIDC-based, no long-lived secrets)
-- Container image builds and pushes to Azure Container Registry (ACR)
-- Terraform/Bicep plan and apply with state management
-- Matrix builds for testing across multiple configurations
-- Secrets management integration with Azure Key Vault
+- **Type-safe database queries**: The backend is written in TypeScript; database interactions should benefit from TypeScript's type system to catch errors at compile time rather than runtime
+- **Multi-tenant query scoping**: Every database query must be scoped to the authenticated tenant's ID to enforce tenant data isolation -- this is a critical security requirement for a CMMC assessment platform handling potentially sensitive CUI data
+- **Schema migrations**: The database schema evolves frequently during MVP development; migrations must be version-controlled, repeatable, and deployable via CI/CD
+- **Developer productivity**: A small team (1-3 developers) needs to move fast; boilerplate SQL and manual type mapping reduce velocity
+- **22-table schema**: The data model is moderately complex with multiple relationships (one-to-many, many-to-many via join tables); an ORM can express these relationships declaratively
 
-The organization uses GitHub Enterprise for source control. The team has experience with both GitHub Actions (3 engineers) and Azure DevOps Pipelines (2 engineers). Both platforms are available under the organization's existing licenses.
-
-The decision must account for developer experience, Azure integration maturity, ecosystem extensibility, and long-term strategic direction.
+The team evaluated Prisma ORM, TypeORM, Knex.js (query builder), and raw SQL with pg (node-postgres) as data access options.
 
 ---
 
 ### Decision
 
-We will use **GitHub Actions** as the CI/CD platform for all build, test, and deployment pipelines.
+We will use **Prisma ORM 5.22** as the data access layer for all PostgreSQL interactions.
 
-Specific implementation details:
-- Authentication to Azure: OIDC federation (Workload Identity Federation) with Entra ID -- no stored credentials
-- Environments: `development`, `staging`, `production` with required reviewers on `production`
-- Reusable workflows: Centralized in a `.github` repository for organization-wide standards
-- Self-hosted runners: AKS-hosted runners using Actions Runner Controller (ARC) for workloads requiring VNet access
-- Secrets: GitHub Actions secrets bootstrapped from Azure Key Vault via OIDC; environment-scoped secrets for sensitive values
-- Caching: GitHub Actions cache for npm/NuGet/Docker layers to optimize build times
-- Status checks: Required status checks on protected branches (build, test, lint, security scan)
+Specific implementation:
+- **Prisma Schema**: Single `schema.prisma` file defining all 22 models as the authoritative schema source of truth
+- **Prisma Client**: Auto-generated, fully typed TypeScript client for all database queries
+- **Prisma Migrate**: Declarative migration system; `prisma migrate dev` for development, `prisma migrate deploy` for CI/CD production deployments
+- **Multi-tenant scoping**: Prisma middleware (or client extensions) automatically inject `tenantId` filter on every query based on the authenticated tenant context from the JWT
+- **Seeding**: `prisma db seed` for populating CMMC control reference data and test data
 
 ---
 
@@ -276,30 +268,32 @@ Specific implementation details:
 
 | # | Option | Pros | Cons |
 |---|--------|------|------|
-| 1 | **GitHub Actions** -- chosen | Native integration with GitHub (source control, PRs, Issues); OIDC federation to Azure (no stored secrets); large marketplace of community actions; reusable workflows for DRY pipelines; strong developer experience (YAML in repo); composite actions for shared logic; Actions Runner Controller for self-hosted runners in AKS; GitHub Environments with protection rules | Fewer built-in Azure deployment tasks compared to Azure DevOps; runner minute limits on GitHub-hosted runners (mitigated by self-hosted); slightly less mature release management UI for multi-stage approvals |
-| 2 | **Azure DevOps Pipelines** | Deep Azure integration with first-party tasks; mature release management with visual pipeline editor; built-in test result aggregation and dashboards; Azure Artifacts for package management; strong multi-stage YAML pipeline support; native Azure service connection management | Requires context-switching between GitHub (source) and Azure DevOps (CI/CD); service connections use stored secrets (less secure than OIDC by default); agent pools require separate management; split tooling reduces developer efficiency; Microsoft's strategic investment increasingly favors GitHub |
-| 3 | **Hybrid: GitHub Actions for CI + Azure DevOps for CD** | Best of both worlds for build and release; leverage Azure DevOps release gates and approvals; keep builds close to source code | Maximum tooling fragmentation; double the YAML to maintain; complex handoff between systems; team must maintain expertise in both platforms; increased cognitive overhead |
+| 1 | **Prisma ORM 5.22** -- chosen | Fully typed client auto-generated from schema; declarative schema file as single source of truth; built-in migration system with version control; middleware/extensions enable transparent multi-tenant scoping; excellent TypeScript integration; intuitive query API; strong documentation and community; schema introspection for existing databases; Prisma Studio for data browsing during development | N+1 query risk requires attention; some advanced SQL operations need raw queries (`prisma.$queryRaw`); generated client adds build step; less flexible than raw SQL for complex aggregations; Prisma-specific migration format (not standard SQL migrations, though SQL is generated) |
+| 2 | **TypeORM** | Mature ORM with decorator-based entity definitions; supports Active Record and Data Mapper patterns; built-in migration support; good TypeScript support; widely used in Node.js ecosystem | Entity definitions via decorators are verbose; TypeScript types are less precise than Prisma (runtime type mismatches possible); migration generation can be unreliable; less intuitive API than Prisma; multi-tenant scoping requires custom implementation with no built-in middleware pattern; slower development pace compared to Prisma |
+| 3 | **Knex.js (Query Builder)** | Lightweight query builder; close to raw SQL with JavaScript fluent API; flexible for complex queries; built-in migration and seeding support; minimal abstraction overhead | No auto-generated types (manual type maintenance); no declarative schema (schema defined in migrations only); multi-tenant scoping requires manual implementation on every query; more boilerplate code; no relationship handling (manual joins) |
+| 4 | **Raw SQL with pg (node-postgres)** | Maximum control and flexibility; no abstraction overhead; direct access to all PostgreSQL features; no dependency on ORM | No type safety (manual type assertions everywhere); no schema management (separate migration tool needed); multi-tenant scoping must be manually implemented on every single query (high risk of missing tenantId filter); maximum boilerplate; no relationship mapping; slow development velocity; high risk of SQL injection if not careful |
 
 ---
 
 ### Consequences
 
 **What becomes easier or better:**
-- Single platform for source control and CI/CD reduces context switching and improves developer velocity
-- PR-driven workflows with required status checks create a natural quality gate
-- OIDC federation to Azure eliminates secret rotation for CI/CD service principals
-- Reusable workflows enable standardization across all repositories without duplicating pipeline logic
-- Community marketplace provides pre-built actions for common tasks (Trivy scanning, Terraform, Helm, ACR push)
-- Self-hosted runners in AKS (via ARC) provide VNet-connected builds at scale with auto-scaling
+- Multi-tenant isolation becomes systematic: Prisma middleware automatically injects `WHERE tenantId = ?` on every query, eliminating the risk of developers forgetting tenant scoping on individual queries
+- Type safety across the stack: TypeScript compiler catches field name typos, missing required fields, and type mismatches at build time
+- Schema evolution is declarative and version-controlled: changing the Prisma schema and running `prisma migrate dev` generates the migration SQL automatically
+- Onboarding new developers is faster: the Prisma schema file is self-documenting; relationship cardinality is declared explicitly
+- Prisma Studio provides a visual database browser for development debugging
 
 **What becomes harder or worse:**
-- Release management UI is less visual than Azure DevOps release pipelines (mitigated by GitHub Environments and deployment logs)
-- Test result aggregation requires additional configuration (third-party actions or custom reporting)
-- GitHub-hosted runner minute limits may require self-hosted runners for large workloads (already planned with ARC)
+- Complex aggregation queries (e.g., SPRS score calculations across multiple tables) may need raw SQL via `prisma.$queryRaw` or `prisma.$queryRawUnsafe`
+- Prisma generates a client library that adds to the build step; regeneration is needed after schema changes (`prisma generate`)
+- Some PostgreSQL-specific features (e.g., CTEs, window functions, advanced JSONB operators) require raw queries
+- Prisma Migrate does not support automatic down migrations; rollbacks require manual forward migrations
 
 **Risks:**
-- GitHub Actions outage impacting deployments: Mitigated by self-hosted runners in AKS that operate independently; critical hotfix process documented for manual deployment if needed
-- Marketplace action supply-chain attacks: Mitigated by pinning actions to specific commit SHAs, using only verified/trusted actions, and internal review before adopting new actions
+- N+1 query performance issues: Mitigated by using Prisma's `include` and `select` for eager loading relationships; monitoring query performance in development; acceptable for MVP scale (< 50 concurrent users)
+- Prisma middleware affecting query performance: Mitigated by the fact that middleware adds a single `WHERE` clause (tenantId filter); negligible performance impact; benchmarked during development
+- Vendor lock-in to Prisma ORM: Mitigated by the fact that Prisma generates standard SQL migrations; the underlying PostgreSQL schema is portable; migration to another ORM or raw SQL is feasible (moderate effort to rewrite query layer)
 
 ---
 
@@ -307,21 +301,20 @@ Specific implementation details:
 
 | Aspect | Implication | Mitigation |
 |--------|------------|------------|
-| Secret Management | CI/CD secrets must be protected and not exposed in logs | Use GitHub Actions secrets (encrypted at rest); OIDC for Azure (no stored credentials); mask sensitive outputs in workflow logs |
-| Audit Trail | All pipeline executions must be auditable for SOC 2 | GitHub audit log captures workflow runs, environment approvals, and secret access; retained for 180 days (GitHub Enterprise) |
-| Access Control | Only authorized users should trigger production deployments | GitHub Environments with required reviewers; branch protection rules; CODEOWNERS for workflow file changes |
-| Supply Chain | Third-party actions could introduce vulnerabilities | Pin all actions to commit SHA; use Dependabot for action version updates; restrict to organization-approved actions via repository policies |
-| Data Residency | Build artifacts and logs are stored on GitHub infrastructure | No PII or customer data in builds; artifacts stored temporarily (90 days); sensitive outputs are masked; self-hosted runners in Azure for workloads processing sensitive data |
+| Tenant Data Isolation | Prisma middleware is the primary enforcement mechanism for tenant-scoped queries; if middleware fails or is bypassed, cross-tenant data leakage could occur | tenantAuth.ts middleware runs before route handlers; integration tests verify tenant scoping; code review process ensures no raw queries bypass tenant filtering; audit log captures all data access with tenant context |
+| SQL Injection | Prisma client uses parameterized queries by default, preventing SQL injection; however, `$queryRaw` and `$queryRawUnsafe` bypass this protection | Code review policy: all uses of `$queryRaw` must use tagged template literals for parameterization; `$queryRawUnsafe` is banned except with explicit security review approval |
+| Audit Trail | All entity mutations must be logged in the AuditLog table | Prisma middleware or service-layer wrapper ensures AuditLog entries are created within the same transaction as the entity mutation |
+| Data at Rest | Prisma connects to PostgreSQL via SSL; database uses Azure-managed TDE | Connection string includes `sslmode=require`; connection string stored in Azure Key Vault |
 
 ---
 
 ### References
 
-- [GitHub Actions documentation](https://docs.github.com/en/actions)
-- [Azure login with OIDC (GitHub Actions)](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure)
-- [Actions Runner Controller (ARC)](https://github.com/actions/actions-runner-controller)
-- [GitHub Actions security hardening](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions)
-- Internal: DevOps Standards and Practices (Confluence: [LINK])
+- [Prisma documentation](https://www.prisma.io/docs)
+- [Prisma Client API reference](https://www.prisma.io/docs/reference/api-reference/prisma-client-reference)
+- [Prisma Migrate documentation](https://www.prisma.io/docs/concepts/components/prisma-migrate)
+- [Prisma middleware](https://www.prisma.io/docs/concepts/components/prisma-client/middleware)
+- [Multi-tenancy with Prisma](https://www.prisma.io/docs/guides/other/multi-tenancy)
 
 ---
 
@@ -329,7 +322,122 @@ Specific implementation details:
 
 | Role | Name | Date | Decision |
 |------|------|------|----------|
-| Solution Architect | Jane Smith | 2026-01-12 | [x] Approve |
-| DevOps Lead | Maria Garcia | 2026-01-13 | [x] Approve |
-| Security Architect | Alice Chen | 2026-01-14 | [x] Approve |
-| Engineering Manager | David Park | 2026-01-14 | [x] Approve |
+| Solution Architect | ___________________ | 2026-01-18 | [x] Approve |
+| Technical Lead | ___________________ | 2026-01-19 | [x] Approve |
+| Security Architect | ___________________ | 2026-01-20 | [x] Approve |
+
+---
+
+---
+
+# ADR-003: Use Microsoft Entra ID over Custom Authentication
+
+## ADR-003: Use Microsoft Entra ID over Custom Authentication
+
+| **Field**        | **Value**                                                |
+|------------------|----------------------------------------------------------|
+| ADR Number       | ADR-003                                                  |
+| Title            | Use Microsoft Entra ID over Custom Authentication        |
+| Date             | 2026-01-10                                               |
+| Status           | `Accepted`                                               |
+| Decision Maker   | Solution Architect                                       |
+| Consulted        | Technical Lead, Security Architect, Product Owner        |
+| Informed         | Development Team, Engineering Manager                    |
+
+---
+
+### Context
+
+The CMMC Assessor Platform is a multi-tenant SaaS application serving defense industrial base (DIB) organizations that are pursuing CMMC certification. The authentication system must meet the following requirements:
+
+- **Enterprise SSO**: Target customers are enterprises with existing identity infrastructure; they expect Single Sign-On (SSO) with their corporate identity provider rather than creating separate credentials
+- **Multi-tenant onboarding**: Each customer organization (tenant) needs a streamlined onboarding process that establishes their organization in the platform and allows all their users to authenticate
+- **MFA enforcement**: CMMC compliance implies strong authentication; the platform should support or inherit Multi-Factor Authentication (MFA) without implementing it from scratch
+- **Microsoft 365 integration**: The platform integrates with Microsoft Graph API for SharePoint evidence management; using Microsoft identity simplifies token acquisition for Graph API calls
+- **Admin consent**: Tenant administrators need to grant organizational consent for the application's permissions (Graph API scopes) during onboarding
+- **Security posture**: As a CMMC assessment platform, the application itself must demonstrate strong security practices; rolling custom authentication increases the attack surface and maintenance burden
+
+The team evaluated Microsoft Entra ID (OAuth 2.0 / OIDC), Auth0 / Okta (third-party IdP), and custom username/password authentication as options.
+
+---
+
+### Decision
+
+We will use **Microsoft Entra ID** as the primary authentication provider via OAuth 2.0 / OpenID Connect, implemented using the `@azure/msal-node` library.
+
+Specific implementation:
+- **Protocol**: OAuth 2.0 Authorization Code Flow with PKCE
+- **Client library**: @azure/msal-node 2.15 (confidential client)
+- **Tenant onboarding**: Admin consent flow via Entra ID's `/adminconsent` endpoint; creates Tenant record with Entra ID tenant ID
+- **User provisioning**: Just-in-time (JIT) user creation on first login; user claims (oid, email, name, tid) extracted from ID token
+- **Token strategy**: Backend issues custom JWTs after Entra ID validation; JWT expiry configurable (currently 7 days); refresh tokens with family-based rotation stored in PostgreSQL
+- **Graph API tokens**: Acquired via incremental consent; encrypted with AES-256-GCM before storage in PostgreSQL UserToken table
+- **Legacy fallback**: Username/password authentication (bcryptjs) retained as a fallback for users who cannot use Entra ID; planned for eventual deprecation
+- **MFA**: Inherited from tenant's Entra ID Conditional Access policies; platform does not manage MFA directly
+
+---
+
+### Alternatives Considered
+
+| # | Option | Pros | Cons |
+|---|--------|------|------|
+| 1 | **Microsoft Entra ID (OAuth 2.0 / OIDC)** -- chosen | Native SSO for enterprise Microsoft customers (the primary target market); admin consent flow enables organizational onboarding; MFA inherited from tenant Conditional Access policies without custom implementation; seamless Graph API token acquisition for SharePoint integration; Microsoft manages identity infrastructure security, patches, and compliance certifications; Entra ID is already trusted by DIB organizations; MSAL library handles token lifecycle (caching, refresh) | Dependency on Microsoft identity platform; complexity of OAuth 2.0 flows (redirects, token exchange, consent); requires Entra ID app registration configuration; multi-tenant app registration requires careful scope and permission management; users without Microsoft accounts need fallback auth |
+| 2 | **Auth0 / Okta (Third-party IdP)** | Managed identity platform with extensive SSO integrations; social login support; pre-built UI components; enterprise SSO via SAML/OIDC federation; MFA built-in; compliance certifications (SOC 2, ISO 27001) | Additional SaaS cost (per-user pricing adds up for B2B); adds another third-party dependency; does not natively integrate with Microsoft Graph API (separate token acquisition needed); less seamless experience for Microsoft-centric enterprise customers; tenant onboarding flow requires custom organization management |
+| 3 | **Custom Username/Password Authentication** | Full control over authentication flow; no external dependencies; simpler initial implementation; no third-party costs | Must implement MFA from scratch (significant effort); no enterprise SSO; poor UX for enterprise users (yet another set of credentials); security maintenance burden (password policies, brute-force protection, credential stuffing defense, breach monitoring); CMMC-sensitive platform rolling custom auth increases risk perception; Graph API integration requires separate OAuth flow anyway; does not scale to enterprise requirements |
+
+---
+
+### Consequences
+
+**What becomes easier or better:**
+- Enterprise customers get SSO with their existing Microsoft identities -- zero friction onboarding for end users
+- MFA is inherited for free from tenant Conditional Access policies -- the platform benefits from MFA without implementing it
+- Admin consent flow provides a clean, one-click organizational onboarding experience
+- Graph API integration (SharePoint evidence management) is seamless because the same identity context is used for both authentication and Graph API token acquisition
+- Security posture is strengthened by offloading identity management to Microsoft, which has dedicated security teams, compliance certifications, and automatic security patching
+- Tenant isolation is simplified: Entra ID tenant ID (tid claim) naturally maps to platform tenant, providing a reliable trust anchor
+
+**What becomes harder or worse:**
+- OAuth 2.0 flow complexity: multiple redirect-based flows (login, admin consent, incremental consent) require careful state management
+- Users without Microsoft accounts (e.g., consultants, auditors from non-Microsoft organizations) need the legacy fallback, adding code paths to maintain
+- App registration configuration in Entra ID requires understanding of delegated vs. application permissions, consent types, and multi-tenant app settings
+- Token management is complex: Entra ID tokens (short-lived), custom JWTs (7-day), refresh tokens (30-day), Graph API tokens (encrypted, stored) -- multiple token types with different lifecycles
+
+**Risks:**
+- Entra ID outage preventing all logins: Mitigated by legacy username/password fallback; Entra ID SLA is 99.99% (< 5 minutes downtime/month); legacy auth allows emergency access
+- App registration misconfiguration exposing data: Mitigated by following Microsoft's security best practices for multi-tenant app registrations; security review of requested permissions; admin consent limits scope to explicitly approved permissions
+- Entra ID client secret expiry breaking authentication: Mitigated by monitoring secret expiry dates; secret rotation documented in operational runbook; planned: automated rotation via Key Vault
+- Graph API consent not granted by tenant admin: Mitigated by incremental consent flow; evidence management features gracefully degrade when Graph API permissions are not available
+
+---
+
+### Compliance and Security Implications
+
+| Aspect | Implication | Mitigation |
+|--------|------------|------------|
+| Authentication Strength | Entra ID enables MFA, Conditional Access, risk-based sign-in policies -- all critical for CMMC-aligned security posture | MFA enforcement is delegated to each tenant's Entra ID Conditional Access policies; platform documentation recommends MFA enforcement for all users |
+| Identity Data Residency | User identity data (name, email, object ID) is processed by Microsoft Entra ID global infrastructure, which may involve cross-border data processing | User identity data is limited to name, email, and Entra ID object ID (not CUI); governed by Microsoft's Data Protection Agreement; no CMMC assessment data is sent to Entra ID |
+| Admin Consent | Tenant administrators grant application permissions on behalf of their organization; this is a sensitive operation | Requested permissions are minimized (openid, profile, email, User.Read for auth; Sites.ReadWrite.All only via incremental consent for evidence); admin consent prompt clearly lists all requested permissions |
+| Token Security | JWTs and Graph API tokens must be protected from theft; compromised tokens could grant unauthorized access | Custom JWTs verified on every request; TokenDenyList enables server-side revocation; refresh tokens use family-based rotation to detect theft; Graph API tokens encrypted at application layer (AES-256-GCM) before database storage; JWT signing key stored in Key Vault |
+| Legacy Auth Security | Username/password fallback has inherent risks (credential stuffing, weak passwords) | bcryptjs for password hashing; express-rate-limit for brute-force protection; legacy auth planned for eventual deprecation as Entra ID adoption reaches critical mass; password complexity enforcement via express-validator |
+
+---
+
+### References
+
+- [Microsoft identity platform documentation](https://learn.microsoft.com/en-us/entra/identity-platform/)
+- [MSAL Node.js documentation](https://learn.microsoft.com/en-us/entra/msal/node/)
+- [Multi-tenant app registration best practices](https://learn.microsoft.com/en-us/entra/identity-platform/howto-convert-app-to-be-multi-tenant)
+- [Admin consent flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-admin-consent)
+- [Microsoft Graph API permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference)
+
+---
+
+### Approval
+
+| Role | Name | Date | Decision |
+|------|------|------|----------|
+| Solution Architect | ___________________ | 2026-01-10 | [x] Approve |
+| Technical Lead | ___________________ | 2026-01-11 | [x] Approve |
+| Security Architect | ___________________ | 2026-01-12 | [x] Approve |
+| Product Owner | ___________________ | 2026-01-12 | [x] Approve |

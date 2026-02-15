@@ -3,27 +3,50 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Networking & Security              |
-| Last Updated     | [YYYY-MM-DD]                       |
-| Status           | [Draft / In Review / Approved]     |
-| Owner            | [TEAM OR INDIVIDUAL NAME]          |
+| Last Updated     | 2026-02-14                         |
+| Status           | Draft                              |
+| Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the network architecture and security controls for the [PROJECT NAME] platform on Azure. It covers VNet design, network security groups, firewall and WAF configuration, private endpoints, DNS strategy, load balancing, TLS management, DDoS protection, and network monitoring.
+This document defines the network architecture and security controls for the CMMC Assessor Platform on Azure. It covers the current state of networking (which is minimal), DNS strategy, TLS management, and identifies the significant security gaps that are tracked as security findings for remediation.
 
 ---
 
 ## 2. Network Architecture Diagram
 
 ```
-[INSERT NETWORK ARCHITECTURE DIAGRAM]
+CURRENT STATE (Minimal -- No VNet)
 
-Recommended tool: draw.io, Visio, or Azure Network Diagram
-Include: VNets, subnets, peering connections, firewalls, gateways,
-         private endpoints, load balancers, and internet-facing resources.
-Export as PNG and embed in Confluence page.
+Internet
+   |
+   +-- cmmc.intellisecops.com
+   |      |  (CNAME -> cmmc-web.*.canadacentral.azurecontainerapps.io)
+   |      v
+   |   cmmc-web (Container App - external ingress)
+   |      Azure Managed TLS Certificate
+   |
+   +-- api.cmmc.intellisecops.com
+          |  (CNAME -> cmmc-api.*.canadacentral.azurecontainerapps.io)
+          v
+       cmmc-api (Container App - external ingress)
+          Azure Managed TLS Certificate
+             |
+             +-- psql-cmmc-assessor-prod
+             |      PostgreSQL Flexible Server
+             |      Firewall: AllowAzureServices (0.0.0.0) [F-12]
+             |
+             +-- stcmmcassessorprod
+             |      Storage Account (Standard_LRS)
+             |      Public access
+             |
+             +-- kv-cmmc-assessor-prod
+                    Key Vault (Standard)
+
+WARNING: No VNet, no private endpoints, no WAF, no firewall.
+See security findings F-09, F-12.
 ```
 
 ---
@@ -32,37 +55,31 @@ Export as PNG and embed in Confluence page.
 
 ### 3.1 VNet Inventory
 
-| VNet Name                 | Address Space   | Region     | Subscription       | Purpose                           |
-|---------------------------|-----------------|------------|--------------------|------------------------------------|
-| [vnet-hub-eus-001]        | [10.0.0.0/16]   | [East US]  | [Connectivity]     | [Hub network - shared services]    |
-| [vnet-app-prod-eus-001]   | [10.1.0.0/16]   | [East US]  | [Production]       | [Production spoke - application]   |
-| [vnet-app-stg-eus-001]    | [10.2.0.0/16]   | [East US]  | [Non-Production]   | [Staging spoke - application]      |
-| [vnet-app-dev-eus-001]    | [10.3.0.0/16]   | [East US]  | [Non-Production]   | [Development spoke - application]  |
-| [vnet-app-prod-wus-001]   | [10.4.0.0/16]   | [West US]  | [Production]       | [DR spoke - application]           |
+**Status: NOT IMPLEMENTED (Security Finding F-09)**
 
-### 3.2 Subnet Design (Production VNet Example)
+| VNet Name                 | Address Space   | Region           | Subscription       | Purpose                           |
+|---------------------------|-----------------|------------------|--------------------|------------------------------------|
+| N/A                       | N/A             | N/A              | N/A                | No VNet deployed                   |
 
-| Subnet Name                | Address Range    | Purpose                            | Available IPs | NSG               | Route Table      | Service Endpoints       | Delegation                    |
-|----------------------------|------------------|-------------------------------------|---------------|--------------------|------------------|-------------------------|-------------------------------|
-| [snet-agw]                 | [10.1.0.0/24]    | Application Gateway                | [251]         | [nsg-agw-prod]     | [rt-agw-prod]    | [None]                  | [None]                        |
-| [snet-aks-system]          | [10.1.1.0/24]    | AKS system node pool               | [251]         | [nsg-aks-prod]     | [rt-aks-prod]    | [None]                  | [None]                        |
-| [snet-aks-user]            | [10.1.2.0/22]    | AKS user node pool                 | [1019]        | [nsg-aks-prod]     | [rt-aks-prod]    | [None]                  | [None]                        |
-| [snet-appservice]          | [10.1.6.0/24]    | App Service VNet integration       | [251]         | [nsg-app-prod]     | [rt-app-prod]    | [None]                  | [Microsoft.Web/serverFarms]   |
-| [snet-functions]           | [10.1.7.0/24]    | Azure Functions VNet integration   | [251]         | [nsg-func-prod]    | [rt-func-prod]   | [None]                  | [Microsoft.Web/serverFarms]   |
-| [snet-vm]                  | [10.1.8.0/24]    | Virtual Machines                   | [251]         | [nsg-vm-prod]      | [rt-vm-prod]     | [None]                  | [None]                        |
-| [snet-data]                | [10.1.9.0/24]    | Database private endpoints         | [251]         | [nsg-data-prod]    | [rt-data-prod]   | [Microsoft.Sql]         | [None]                        |
-| [snet-pe]                  | [10.1.10.0/24]   | Shared private endpoints           | [251]         | [nsg-pe-prod]      | [rt-pe-prod]     | [None]                  | [None]                        |
-| [snet-bastion]             | [10.1.11.0/26]   | Azure Bastion                      | [59]          | [N/A - managed]    | [N/A]            | [None]                  | [None]                        |
-| [SUBNET NAME]              | [ADDRESS RANGE]  | [PURPOSE]                          | [COUNT]       | [NSG]              | [ROUTE TABLE]    | [ENDPOINTS]             | [DELEGATION]                  |
+> **Current State:** There is no Virtual Network deployed. All services communicate over public endpoints. This is tracked as security finding F-09 and is planned for Phase 1 remediation.
 
-### 3.3 VNet Peering
+### Planned VNet Design (Target State)
 
-| Peering Name                          | Source VNet                | Target VNet              | Allow Gateway Transit | Use Remote Gateways | Traffic Forwarding |
-|---------------------------------------|----------------------------|--------------------------|-----------------------|---------------------|--------------------|
-| [peer-prod-to-hub]                    | [vnet-app-prod-eus-001]    | [vnet-hub-eus-001]       | [No]                  | [Yes]               | [Yes]              |
-| [peer-hub-to-prod]                    | [vnet-hub-eus-001]         | [vnet-app-prod-eus-001]  | [Yes]                 | [No]                | [Yes]              |
-| [peer-stg-to-hub]                     | [vnet-app-stg-eus-001]     | [vnet-hub-eus-001]       | [No]                  | [Yes]               | [Yes]              |
-| [PEERING NAME]                        | [SOURCE]                   | [TARGET]                 | [VALUE]               | [VALUE]             | [VALUE]            |
+| VNet Name                 | Address Space    | Region           | Purpose                           |
+|---------------------------|------------------|------------------|------------------------------------|
+| vnet-cmmc-assessor-prod   | 10.0.0.0/16      | Canada Central   | Production workloads               |
+
+### Planned Subnet Design
+
+| Subnet Name                  | Address Range      | Purpose                            | Delegation                           |
+|------------------------------|--------------------|------------------------------------|--------------------------------------|
+| snet-container-apps          | 10.0.0.0/23        | Container Apps Environment         | Microsoft.App/environments           |
+| snet-postgresql              | 10.0.2.0/24        | PostgreSQL Flexible Server         | Microsoft.DBforPostgreSQL/flexibleServers |
+| snet-private-endpoints       | 10.0.3.0/24        | Private endpoints (KV, Storage)    | None                                 |
+
+### 3.2 VNet Peering
+
+N/A -- No VNets deployed.
 
 ---
 
@@ -70,76 +87,56 @@ Export as PNG and embed in Confluence page.
 
 ### 4.1 NSG Inventory
 
-| NSG Name             | Associated Subnet         | Environment  | Rule Count | Last Reviewed   |
-|----------------------|---------------------------|--------------|------------|-----------------|
-| [nsg-agw-prod]       | [snet-agw]                | Production   | [X]        | [YYYY-MM-DD]    |
-| [nsg-aks-prod]       | [snet-aks-system, user]   | Production   | [X]        | [YYYY-MM-DD]    |
-| [nsg-app-prod]       | [snet-appservice]         | Production   | [X]        | [YYYY-MM-DD]    |
-| [nsg-data-prod]      | [snet-data]               | Production   | [X]        | [YYYY-MM-DD]    |
-| [nsg-vm-prod]        | [snet-vm]                 | Production   | [X]        | [YYYY-MM-DD]    |
+**Status: NOT IMPLEMENTED**
 
-### 4.2 NSG Rules Summary (Production Example)
-
-| NSG Name         | Priority | Direction | Name                    | Source              | Destination         | Port        | Protocol | Action |
-|------------------|----------|-----------|-------------------------|---------------------|---------------------|-------------|----------|--------|
-| [nsg-agw-prod]   | [100]    | Inbound   | [Allow-HTTPS-Internet]  | [Internet]          | [snet-agw]          | [443]       | [TCP]    | [Allow]|
-| [nsg-agw-prod]   | [110]    | Inbound   | [Allow-GWM]             | [GatewayManager]    | [snet-agw]          | [65200-65535]| [TCP]   | [Allow]|
-| [nsg-aks-prod]   | [100]    | Inbound   | [Allow-AGW-to-AKS]     | [snet-agw]          | [snet-aks-user]     | [80,443]    | [TCP]    | [Allow]|
-| [nsg-data-prod]  | [100]    | Inbound   | [Allow-AKS-to-SQL]     | [snet-aks-user]     | [snet-data]         | [1433]      | [TCP]    | [Allow]|
-| [nsg-data-prod]  | [110]    | Inbound   | [Allow-App-to-SQL]     | [snet-appservice]   | [snet-data]         | [1433]      | [TCP]    | [Allow]|
-| [nsg-vm-prod]    | [100]    | Inbound   | [Allow-Bastion-SSH]    | [snet-bastion]      | [snet-vm]           | [22]        | [TCP]    | [Allow]|
-| [nsg-vm-prod]    | [200]    | Inbound   | [Deny-All-Inbound]    | [*]                 | [*]                 | [*]         | [*]      | [Deny] |
-| [NSG NAME]       | [PRI]    | [DIR]     | [RULE NAME]            | [SOURCE]            | [DESTINATION]       | [PORT]      | [PROTO]  | [ACT]  |
+No NSGs are deployed. NSGs will be created when the VNet is implemented.
 
 ---
 
 ## 5. Azure Firewall / WAF Configuration
 
-### 5.1 Azure Firewall (if deployed)
+### 5.1 Azure Firewall
 
-| Attribute                     | Value                                           |
-|-------------------------------|-------------------------------------------------|
-| Firewall Name                 | [fw-hub-eus-001]                                |
-| SKU                           | [Standard / Premium]                            |
-| Location                      | [Hub VNet - snet-firewall]                      |
-| Threat Intelligence Mode      | [Alert / Deny]                                  |
-| IDPS Mode (Premium)           | [Alert / Alert and Deny]                        |
-| DNS Proxy                     | [Enabled]                                       |
-| Firewall Policy               | [fwpol-hub-eus-001]                             |
+**Status: NOT IMPLEMENTED**
+
+No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 ### 5.2 Web Application Firewall (WAF)
 
+**Status: NOT IMPLEMENTED**
+
 | Attribute                     | Value                                           |
 |-------------------------------|-------------------------------------------------|
-| WAF Type                      | [Application Gateway WAF v2 / Front Door WAF]   |
-| WAF Mode                      | [Detection / Prevention]                         |
-| Rule Set                      | [OWASP 3.2 / Microsoft Default Rule Set 2.1]    |
-| Custom Rules                  | [LIST CUSTOM WAF RULES]                         |
-| Exclusions                    | [LIST ANY EXCLUSIONS WITH JUSTIFICATION]        |
-| Bot Protection                | [Enabled / Disabled]                            |
-| Rate Limiting                 | [RATE LIMIT RULES]                              |
+| WAF Type                      | NOT IMPLEMENTED                                 |
+| WAF Mode                      | N/A                                             |
 
-### 5.3 Firewall Network Rules (Summary)
+> **Current State:** No WAF is deployed. Container Apps have external ingress without any WAF protection. Application-level input validation exists but no network-level web application firewall.
 
-| Rule Collection          | Priority | Action | Source                | Destination             | Port       | Protocol |
-|--------------------------|----------|--------|-----------------------|-------------------------|------------|----------|
-| [Allow-Azure-Services]   | [100]    | [Allow]| [Spoke VNets]         | [AzureCloud]            | [443]      | [TCP]    |
-| [Allow-DNS]              | [200]    | [Allow]| [All VNets]           | [DNS Servers]           | [53]       | [UDP/TCP]|
-| [Allow-NTP]              | [300]    | [Allow]| [All VNets]           | [NTP Servers]           | [123]      | [UDP]    |
-| [Deny-All]               | [65000]  | [Deny] | [*]                   | [*]                     | [*]        | [*]      |
+### Planned Improvements
+
+- Evaluate Azure Front Door with WAF for the production endpoints
+- Consider Azure Application Gateway with WAF v2 if VNet is implemented
 
 ---
 
 ## 6. Private Endpoints Inventory
 
-| Service                    | Private Endpoint Name            | Subnet         | Private IP     | Private DNS Zone                           | Resource Name             |
-|----------------------------|----------------------------------|----------------|----------------|--------------------------------------------|---------------------------|
-| Azure SQL Database         | [pe-sql-prod-eus-001]            | [snet-data]    | [10.1.9.4]     | [privatelink.database.windows.net]         | [sql-db-prod-eus-001]     |
-| Azure Storage (Blob)       | [pe-st-blob-prod-eus-001]        | [snet-pe]      | [10.1.10.4]    | [privatelink.blob.core.windows.net]        | [stapprodeus001]          |
-| Azure Key Vault            | [pe-kv-prod-eus-001]             | [snet-pe]      | [10.1.10.5]    | [privatelink.vaultcore.azure.net]          | [kv-app-prod-eus-001]     |
-| Azure Container Registry   | [pe-acr-prod-eus-001]            | [snet-pe]      | [10.1.10.6]    | [privatelink.azurecr.io]                   | [acrprodeus001]           |
-| Azure Service Bus          | [pe-sb-prod-eus-001]             | [snet-pe]      | [10.1.10.7]    | [privatelink.servicebus.windows.net]       | [sb-app-prod-eus-001]     |
-| [SERVICE]                  | [PE NAME]                        | [SUBNET]       | [IP]           | [DNS ZONE]                                 | [RESOURCE]                |
+**Status: NOT IMPLEMENTED**
+
+| Service                    | Private Endpoint Name            | Status         |
+|----------------------------|----------------------------------|----------------|
+| PostgreSQL Flexible Server | N/A                              | NOT IMPLEMENTED |
+| Storage Account            | N/A                              | NOT IMPLEMENTED |
+| Key Vault                  | N/A                              | NOT IMPLEMENTED |
+| Container Registry         | N/A                              | NOT IMPLEMENTED |
+
+> **Current State:** No private endpoints are deployed. All Azure services are accessed over public endpoints. PostgreSQL has an AllowAzureServices firewall rule (0.0.0.0) which is a security finding (F-12).
+
+### Planned Improvements
+
+- Deploy private endpoints for PostgreSQL, Key Vault, and Storage Account as part of VNet implementation
+- Remove the AllowAzureServices firewall rule from PostgreSQL (F-12)
+- Restrict Container Registry access via private endpoint or IP rules
 
 ---
 
@@ -149,31 +146,22 @@ Export as PNG and embed in Confluence page.
 
 | Attribute                    | Value                                              |
 |------------------------------|----------------------------------------------------|
-| Public DNS Provider          | [Azure DNS / External provider]                    |
-| Public DNS Zone              | [company.com]                                      |
-| Internal DNS                 | [Azure Private DNS Zones]                          |
-| DNS Forwarding               | [Azure Firewall DNS Proxy / Custom DNS servers]    |
-| Split-brain DNS              | [Yes / No]                                         |
+| Public DNS Provider          | GoDaddy                                            |
+| Public DNS Zone              | intellisecops.com                                  |
+| Internal DNS                 | N/A (no VNet, no private DNS zones)                |
+| DNS Forwarding               | N/A                                                |
+| Split-brain DNS              | No                                                 |
 
 ### 7.2 Private DNS Zones
 
-| Private DNS Zone                            | Linked VNets                               | Purpose                          |
-|---------------------------------------------|--------------------------------------------|----------------------------------|
-| [privatelink.database.windows.net]          | [Hub, Prod, Staging, Dev]                  | SQL Database private endpoints   |
-| [privatelink.blob.core.windows.net]         | [Hub, Prod, Staging, Dev]                  | Storage Blob private endpoints   |
-| [privatelink.vaultcore.azure.net]           | [Hub, Prod, Staging, Dev]                  | Key Vault private endpoints      |
-| [privatelink.azurecr.io]                    | [Hub, Prod, Staging, Dev]                  | Container Registry endpoints     |
-| [privatelink.servicebus.windows.net]        | [Hub, Prod, Staging, Dev]                  | Service Bus private endpoints    |
-| [PROJECT.internal]                          | [Hub, Prod, Staging, Dev]                  | Custom internal DNS              |
-| [DNS ZONE]                                  | [LINKED VNETS]                             | [PURPOSE]                        |
+**Status: NOT IMPLEMENTED** -- No private DNS zones exist. These will be created when private endpoints are deployed.
 
 ### 7.3 Key DNS Records
 
-| Record Name                  | Type  | Value                          | Zone                   | TTL     |
-|------------------------------|-------|--------------------------------|------------------------|---------|
-| [app.company.com]            | [A]   | [Application Gateway public IP]| [company.com]          | [300]   |
-| [api.company.com]            | [CNAME]| [Front Door endpoint]         | [company.com]          | [300]   |
-| [RECORD]                     | [TYPE]| [VALUE]                        | [ZONE]                 | [TTL]   |
+| Record Name                          | Type    | Value                                                           | Zone                   | TTL     |
+|--------------------------------------|---------|-----------------------------------------------------------------|------------------------|---------|
+| cmmc.intellisecops.com               | CNAME   | cmmc-web.{unique}.canadacentral.azurecontainerapps.io           | intellisecops.com      | Default |
+| api.cmmc.intellisecops.com           | CNAME   | cmmc-api.{unique}.canadacentral.azurecontainerapps.io           | intellisecops.com      | Default |
 
 ---
 
@@ -183,23 +171,18 @@ Export as PNG and embed in Confluence page.
 
 | Layer              | Service                      | Resource Name                 | Purpose                                | Backend Targets            |
 |--------------------|------------------------------|-------------------------------|----------------------------------------|----------------------------|
-| Global (L7)       | [Azure Front Door]            | [afd-app-prod-001]            | [Global load balancing, CDN, WAF]      | [Application Gateway]      |
-| Regional (L7)     | [Application Gateway v2]      | [agw-app-prod-eus-001]        | [Regional L7 load balancing, WAF]      | [AKS Ingress, App Service] |
-| Internal (L4)     | [Azure Load Balancer]         | [ilb-app-prod-eus-001]        | [Internal service load balancing]      | [VMs, internal services]   |
-| Kubernetes        | [NGINX Ingress / AGIC]        | [Deployed in AKS]             | [Kubernetes ingress routing]           | [Kubernetes services]      |
+| Application (L7)  | Container Apps built-in       | Managed by Azure              | HTTP load balancing for Container Apps | Container App replicas     |
 
-### 8.2 Application Gateway Configuration
+> **Current State:** Load balancing is handled entirely by the Azure Container Apps platform. There is no Application Gateway, no Azure Front Door, and no external load balancer. Container Apps provides built-in HTTP load balancing across replicas.
 
-| Attribute                     | Value                                         |
-|-------------------------------|-----------------------------------------------|
-| SKU                           | [WAF_v2]                                      |
-| Capacity (min/max)            | [2 / 10 (autoscale)]                          |
-| Frontend IP                   | [Public + Private]                            |
-| Listeners                     | [HTTPS on 443]                                |
-| Backend Pools                 | [AKS, App Service]                            |
-| Health Probes                 | [/health, interval 30s, threshold 3]          |
-| SSL Policy                    | [AppGwSslPolicy20220101 or custom]            |
-| Cookie Affinity               | [Disabled / Enabled per backend]              |
+### 8.2 Scaling Configuration
+
+| Container App | Min Replicas | Max Replicas | Scale Rule                | Concurrency |
+|---------------|-------------|-------------|---------------------------|-------------|
+| cmmc-api      | 0           | 3           | HTTP concurrent requests  | 50          |
+| cmmc-web      | 0           | 3           | HTTP concurrent requests  | 100         |
+
+> **Note:** Scale-to-zero is enabled for cost optimization. This causes cold starts when the application receives traffic after a period of inactivity.
 
 ---
 
@@ -207,26 +190,25 @@ Export as PNG and embed in Confluence page.
 
 | Attribute                     | Value                                                |
 |-------------------------------|------------------------------------------------------|
-| Certificate Authority         | [DigiCert / Let's Encrypt / Internal CA]             |
-| Certificate Storage           | [Azure Key Vault]                                    |
-| Auto-Renewal                  | [Yes -- via Key Vault integration / ACME / manual]   |
-| Minimum TLS Version           | [TLS 1.2]                                            |
-| Cipher Suites                 | [Azure default / Custom policy]                      |
+| Certificate Authority         | Azure Managed Certificates (free, auto-renewed)      |
+| Certificate Storage           | Managed by Container Apps platform                   |
+| Auto-Renewal                  | Yes -- Azure managed                                 |
+| Minimum TLS Version           | TLS 1.2 (Container Apps default)                     |
+| Cipher Suites                 | Azure default                                        |
 
 ### Certificate Inventory
 
-| Domain                    | Certificate Name             | Key Vault              | Expiry Date    | Auto-Renew | Used By                        |
-|---------------------------|------------------------------|------------------------|----------------|------------|--------------------------------|
-| [*.company.com]           | [wildcard-company-com]       | [kv-app-prod-eus-001]  | [YYYY-MM-DD]   | [Yes]      | [Application Gateway, AKS]     |
-| [api.company.com]         | [api-company-com]            | [kv-app-prod-eus-001]  | [YYYY-MM-DD]   | [Yes]      | [Front Door]                   |
-| [DOMAIN]                  | [CERT NAME]                  | [KEY VAULT]            | [DATE]         | [Y/N]      | [SERVICES]                     |
+| Domain                          | Certificate Type           | Auto-Renew | Used By               |
+|---------------------------------|----------------------------|------------|------------------------|
+| cmmc.intellisecops.com          | Azure Managed Certificate  | Yes        | cmmc-web Container App |
+| api.cmmc.intellisecops.com      | Azure Managed Certificate  | Yes        | cmmc-api Container App |
 
 ### Certificate Renewal Process
 
-- [ ] Certificate renewal alerts configured (30, 14, 7 days before expiry)
-- [ ] Auto-renewal tested and verified
-- [ ] Certificate binding updated in Application Gateway / AKS after renewal
-- [ ] Certificate pinning considerations documented (avoid if possible)
+- [x] Auto-renewal managed by Azure Container Apps platform
+- [ ] Certificate renewal alerts configured -- **N/A (Azure managed)**
+- [ ] Certificate binding updated automatically -- **Yes (Azure managed)**
+- [x] No certificate pinning in use
 
 ---
 
@@ -234,12 +216,13 @@ Export as PNG and embed in Confluence page.
 
 | Attribute                     | Value                                           |
 |-------------------------------|-------------------------------------------------|
-| DDoS Protection Plan          | [Azure DDoS Protection Standard / Basic]        |
-| Protected Resources           | [Public IPs: Application Gateway, Front Door]   |
-| DDoS Policy                   | [Default / Custom thresholds]                   |
-| Alerting                      | [Azure Monitor alerts on DDoS metrics]          |
-| Diagnostic Logs               | [Enabled, sent to Log Analytics]                |
-| Mitigation Reports            | [Enabled]                                       |
+| DDoS Protection Plan          | Azure DDoS Protection Basic (default, free)     |
+| Protected Resources           | Container Apps public endpoints                  |
+| DDoS Policy                   | Default Azure Basic protection                  |
+| Alerting                      | NOT IMPLEMENTED                                 |
+| Diagnostic Logs               | NOT IMPLEMENTED                                 |
+
+> **Current State:** Only Azure DDoS Protection Basic (free, default) is in effect. DDoS Protection Standard is not enabled and is not considered necessary at the current scale and traffic levels.
 
 ---
 
@@ -247,37 +230,22 @@ Export as PNG and embed in Confluence page.
 
 ### 11.1 Azure Network Watcher
 
-| Feature                        | Status         | Configuration                                   |
-|--------------------------------|----------------|-------------------------------------------------|
-| Network Watcher                | [Enabled]      | [Enabled in all deployed regions]               |
-| NSG Flow Logs                  | [Enabled]      | [Version 2, 90-day retention]                   |
-| Traffic Analytics              | [Enabled]      | [10-minute processing interval]                 |
-| Connection Monitor             | [Configured]   | [Monitoring key endpoints]                      |
-| Packet Capture                 | [On demand]    | [Available for troubleshooting]                 |
-| IP Flow Verify                 | [On demand]    | [Available for troubleshooting]                 |
-| Next Hop                       | [On demand]    | [Available for troubleshooting]                 |
+| Feature                        | Status              | Configuration                                   |
+|--------------------------------|---------------------|-------------------------------------------------|
+| Network Watcher                | Default (auto)      | Enabled in Canada Central by default            |
+| NSG Flow Logs                  | NOT IMPLEMENTED     | No NSGs deployed                                |
+| Traffic Analytics              | NOT IMPLEMENTED     | No NSGs or flow logs                            |
+| Connection Monitor             | NOT IMPLEMENTED     | No connection monitoring configured             |
 
-### 11.2 NSG Flow Logs Configuration
+### 11.2 Network Alerts
 
-| Attribute                      | Value                                          |
-|--------------------------------|------------------------------------------------|
-| Flow Log Version               | [2]                                            |
-| Storage Account                | [stflowlogprodeus001]                          |
-| Log Analytics Workspace        | [log-app-prod-eus-001]                         |
-| Retention (Storage)            | [90 days]                                      |
-| Retention (Log Analytics)      | [30 days]                                      |
-| Traffic Analytics Enabled      | [Yes]                                          |
-| Traffic Analytics Interval     | [10 minutes]                                   |
+**Status: NOT IMPLEMENTED** -- No network-specific alerts are configured.
 
-### 11.3 Network Alerts
+### Planned Improvements
 
-| Alert Name                              | Condition                            | Severity | Action Group           |
-|-----------------------------------------|--------------------------------------|----------|------------------------|
-| [DDoS attack detected]                  | [DDoS Mitigation triggered]         | [Sev 1]  | [ag-security-alerts]   |
-| [Application Gateway unhealthy hosts]   | [Unhealthy backend count > 0]       | [Sev 2]  | [ag-infra-alerts]      |
-| [VPN Gateway disconnected]              | [Tunnel status = Disconnected]      | [Sev 2]  | [ag-infra-alerts]      |
-| [NSG rule modified]                     | [Activity log: NSG write]           | [Sev 3]  | [ag-security-alerts]   |
-| [ALERT NAME]                            | [CONDITION]                          | [SEV]    | [ACTION GROUP]         |
+- Enable NSG Flow Logs when VNet and NSGs are deployed
+- Configure Traffic Analytics for network visibility
+- Add alerts for network anomalies
 
 ---
 
@@ -285,31 +253,38 @@ Export as PNG and embed in Confluence page.
 
 ### Network Security
 
-- [ ] All production databases accessible only via private endpoints
-- [ ] No public IP addresses on VMs (Bastion used for access)
-- [ ] NSG rules follow least-privilege principle
-- [ ] Outbound internet access restricted via Azure Firewall
-- [ ] WAF enabled in Prevention mode for production
-- [ ] TLS 1.2 minimum enforced on all endpoints
-- [ ] Network segmentation verified between environments
-- [ ] VNet peering limited to required spoke-to-hub connections
-- [ ] Service endpoints or private endpoints used for all PaaS services
-- [ ] DDoS Protection Standard enabled for public-facing resources
+- [ ] All production databases accessible only via private endpoints -- **FAIL (F-12: AllowAzureServices rule)**
+- [x] No public IP addresses on VMs -- **N/A (no VMs)**
+- [ ] NSG rules follow least-privilege principle -- **FAIL (no NSGs deployed, F-09)**
+- [ ] Outbound internet access restricted via Azure Firewall -- **FAIL (no firewall)**
+- [ ] WAF enabled in Prevention mode for production -- **FAIL (no WAF)**
+- [x] TLS 1.2 minimum enforced on all endpoints
+- [ ] Network segmentation verified between environments -- **FAIL (no VNet, no segmentation)**
+- [ ] Service endpoints or private endpoints used for all PaaS services -- **FAIL (no private endpoints)**
+- [ ] DDoS Protection Standard enabled for public-facing resources -- **N/A (Basic only, acceptable at current scale)**
+- [ ] CORS configured correctly -- **Partial (F-40: allows localhost in prod)**
 
 ### Monitoring and Compliance
 
-- [ ] NSG Flow Logs enabled for all NSGs
-- [ ] Traffic Analytics enabled
-- [ ] Network Watcher enabled in all regions
-- [ ] Azure Policy auditing network compliance
-- [ ] Regular NSG rule review scheduled ([FREQUENCY])
-- [ ] Penetration testing scheduled ([FREQUENCY])
+- [ ] NSG Flow Logs enabled for all NSGs -- **FAIL (no NSGs)**
+- [ ] Traffic Analytics enabled -- **FAIL**
+- [x] Network Watcher enabled in deployed region (default)
+- [ ] Azure Policy auditing network compliance -- **NOT IMPLEMENTED**
+- [ ] Regular NSG rule review scheduled -- **NOT IMPLEMENTED**
+- [ ] Penetration testing scheduled -- **NOT IMPLEMENTED**
+
+### Key Security Findings Related to Networking
+
+| Finding ID | Description                                              | Severity | Status  |
+|------------|----------------------------------------------------------|----------|---------|
+| F-09       | No VNet deployed for network isolation                   | High     | Planned |
+| F-12       | PostgreSQL AllowAzureServices firewall rule (0.0.0.0)    | High     | Planned |
+| F-40       | CORS allows localhost in production                      | Medium   | Planned |
 
 ---
 
 ## 13. Revision History
 
-| Date           | Author            | Changes Made                              |
-|----------------|-------------------|-------------------------------------------|
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [Initial document creation]               |
-| [YYYY-MM-DD]   | [AUTHOR NAME]     | [DESCRIPTION OF CHANGES]                  |
+| Date           | Author               | Changes Made                              |
+|----------------|-----------------------|-------------------------------------------|
+| 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |
