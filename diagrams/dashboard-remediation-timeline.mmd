@@ -1,0 +1,25 @@
+gantt
+    title Security Remediation Timeline
+    dateFormat YYYY-MM-DD
+    axisFormat %b %d
+
+    section Phase 1 — Critical
+    F-01 Open redirect fix          :crit, done, p1a, 2026-02-11, 2026-02-13
+    F-02 Add .dockerignore          :crit, done, p1b, 2026-02-11, 2026-02-13
+    F-03 Restrict registration      :crit, done, p1c, 2026-02-11, 2026-02-13
+    F-04 Rate limiting              :crit, done, p1d, 2026-02-11, 2026-02-13
+
+    section Phase 2 — High
+    F-05 JWT from URL params        :active, p2a, 2026-02-13, 2026-02-25
+    F-09 VNet isolation             :active, p2b, 2026-02-13, 2026-02-25
+    F-10 Key Vault integration      :active, p2c, 2026-02-13, 2026-02-25
+    F-12 PostgreSQL firewall        :active, p2d, 2026-02-13, 2026-02-25
+
+    section Phase 3 — Medium
+    F-30 Structured logging         :p3a, 2026-02-25, 2026-05-11
+    F-31 npm audit enforcement      :p3b, 2026-02-25, 2026-05-11
+    F-32 Dependabot setup           :p3c, 2026-02-25, 2026-05-11
+    F-37 Log PII redaction          :p3d, 2026-02-25, 2026-05-11
+
+    section Phase 4 — Low
+    Remaining 11 findings           :p4a, 2026-05-11, 2026-08-11
