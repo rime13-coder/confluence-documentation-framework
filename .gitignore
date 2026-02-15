@@ -4,6 +4,8 @@
 # Confluence credentials (NEVER commit)
 scripts/config.yaml
 scripts/config.json
+scripts/config-m365.yaml
+scripts/config-m365.json
 
 # OS files
 .DS_Store

@@ -1,0 +1,13 @@
+{
+  "confluence": {
+    "base_url": "https://YOUR_DOMAIN.atlassian.net",
+    "email": "your-email@company.com",
+    "api_token": "YOUR_API_TOKEN"
+  },
+  "space": {
+    "key": "YOUR_SPACE_KEY"
+  },
+  "project": {
+    "name": "CMMC Assessor Platform"
+  }
+}

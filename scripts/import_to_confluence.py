@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -290,7 +291,7 @@ def _convert_comments_to_info_macros(html: str) -> str:
 
 
 def load_config(config_path: str) -> dict:
-    """Load and validate the YAML configuration file."""
+    """Load and validate the configuration file (YAML or JSON)."""
     path = Path(config_path)
     if not path.exists():
         print(f"Config file not found: {config_path}")
@@ -298,7 +299,10 @@ def load_config(config_path: str) -> dict:
         sys.exit(1)
 
     with open(path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        if path.suffix == ".json":
+            config = json.load(f)
+        else:
+            config = yaml.safe_load(f)
 
     # Validate required fields
     required = [
@@ -318,7 +322,7 @@ def load_config(config_path: str) -> dict:
     return config
 
 
-def run_import(config_path: str, dry_run: bool = False, section_filter: str = None):
+def run_import(config_path: str, dry_run: bool = False, section_filter: str = None, templates_dir: str = None):
     """Main import workflow."""
     config = load_config(config_path)
 
@@ -326,7 +330,7 @@ def run_import(config_path: str, dry_run: bool = False, section_filter: str = No
     space_key = config["space"]["key"]
     project_name = config["project"]["name"]
 
-    templates_dir = Path(__file__).parent.parent / "templates"
+    templates_dir = Path(templates_dir) if templates_dir else Path(__file__).parent.parent / "templates"
     if not templates_dir.exists():
         print(f"Templates directory not found: {templates_dir}")
         sys.exit(1)
@@ -483,6 +487,16 @@ if __name__ == "__main__":
         default=None,
         help="Only import a specific section (e.g., '01-project-overview')",
     )
+    parser.add_argument(
+        "--templates-dir",
+        default=None,
+        help="Path to templates directory (default: templates/ next to scripts/)",
+    )
     args = parser.parse_args()
 
-    run_import(config_path=args.config, dry_run=args.dry_run, section_filter=args.section)
+    run_import(
+        config_path=args.config,
+        dry_run=args.dry_run,
+        section_filter=args.section,
+        templates_dir=args.templates_dir,
+    )
