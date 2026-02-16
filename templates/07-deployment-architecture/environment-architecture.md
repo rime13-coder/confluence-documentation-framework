@@ -3,15 +3,15 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Environment Architecture           |
-| Last Updated     | 2026-02-14                         |
-| Status           | Draft                              |
+| Last Updated     | 2026-02-15                         |
+| Status           | Updated -- prod-v2 migration       |
 | Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document describes the architecture, configuration, and access strategy for each deployment environment of the CMMC Assessor Platform on Azure. Currently only a single production environment exists. Development and staging environments are planned but NOT IMPLEMENTED.
+This document describes the architecture, configuration, and access strategy for each deployment environment of the CMMC Assessor Platform on Azure. The application has been migrated to the prod-v2 environment in subscription sub-is-secops-prod (400dce0f) as of 2026-02-15, with VNet isolation, private endpoints, Key Vault references, managed identity, and App Gateway WAF v2. Development and staging environments are planned but NOT IMPLEMENTED.
 
 ---
 
@@ -21,9 +21,10 @@ This document describes the architecture, configuration, and access strategy for
 |---------------|------------------------------------------|------------------------------|---------------------|------------------------|------------------|
 | Development   | Active development and integration       | NOT IMPLEMENTED              | N/A                 | N/A                    | NOT IMPLEMENTED  |
 | Staging       | Pre-production validation and UAT        | NOT IMPLEMENTED              | N/A                 | N/A                    | NOT IMPLEMENTED  |
-| Production    | Live customer-facing workloads           | CMMC Assessor Prod           | Best effort (no SLA defined) | Real / sensitive | Active           |
+| Production (legacy) | Deprecated legacy environment       | CMMC Assessor Prod           | N/A                 | N/A                    | Deprecated       |
+| Production (prod-v2) | Live customer-facing workloads     | sub-is-secops-prod (400dce0f) | Best effort (no SLA defined) | Real / sensitive | Active           |
 
-> **Current State:** Only a single production environment exists. All development is done locally. Code is deployed directly to production on push to main. There is no staging or development environment in Azure.
+> **Current State:** The application has been migrated to prod-v2 in subscription sub-is-secops-prod (400dce0f). The legacy production environment is deprecated. All development is done locally. Development and staging environments are planned but NOT IMPLEMENTED.
 
 ### Planned Improvements
 
@@ -55,54 +56,61 @@ NOT IMPLEMENTED
 A staging environment is planned but does not currently exist.
 ```
 
-### 3.3 Production Environment
+### 3.3 Production Environment (prod-v2)
 
 ```
 Internet
    |
-   +-- cmmc.intellisecops.com (CNAME)
-   |      |
-   |      v
-   |   cmmc-web (Container App, 0.25 CPU, 0.5Gi)
-   |      Frontend (Next.js)
-   |
-   +-- api.cmmc.intellisecops.com (CNAME)
+   +-- cmmc.intellisecops.com (Custom domain)
           |
           v
-       cmmc-api (Container App, 0.5 CPU, 1Gi)
-          Backend API (Node.js/Express)
-             |
-             +-- psql-cmmc-assessor-prod (PostgreSQL Flexible Server, B1ms)
-             +-- stcmmcassessorprod (Storage Account, Standard_LRS)
-             +-- kv-cmmc-assessor-prod (Key Vault)
+       Application Gateway WAF v2 (appgw-ams)
+          |
+          v
+       VNet (prod-v2, sub-is-secops-prod / 400dce0f)
+          |
+          +-- cae-cmmc-v2-prod (Container Apps Environment, VNet-integrated)
+          |      |
+          |      +-- cmmc-web (Container App, 0.25 CPU, 0.5Gi)
+          |      |      Frontend (React 18 SPA)
+          |      |      FQDN: cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io
+          |      |
+          |      +-- cmmc-api (Container App, 0.5 CPU, 1Gi)
+          |             Backend API (Node.js/Express)
+          |             FQDN: cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io
+          |             |
+          |             +-- psql-cmmc-v2-prod (PostgreSQL, private endpoint, no public access)
+          |             +-- kv-cmmc-v2-prod (Key Vault, private endpoint, managed identity)
+          |
+          +-- acrcmmcv2prod (Container Registry, Basic)
 
-Shared:
-   +-- acrcmmcassessorprod (Container Registry, Basic)
-   +-- log-cmmc-assessor-prod (Log Analytics)
-   +-- cae-cmmc-assessor-prod (Container Apps Environment)
+Managed Identity: system-assigned on Container Apps for Key Vault, PostgreSQL, ACR
+Custom Domain: cmmc.intellisecops.com via App Gateway WAF v2 (appgw-ams)
 ```
 
 ---
 
 ## 4. Environment Comparison Table
 
-| Attribute                   | Development                        | Staging                            | Production                          |
+| Attribute                   | Development                        | Staging                            | Production (prod-v2)                |
 |-----------------------------|------------------------------------|------------------------------------|-------------------------------------|
-| **Status**                  | NOT IMPLEMENTED                    | NOT IMPLEMENTED                    | Active                              |
+| **Status**                  | NOT IMPLEMENTED                    | NOT IMPLEMENTED                    | Active (sub-is-secops-prod / 400dce0f) |
 | **Container Apps CPU**      | N/A                                | N/A                                | API: 0.5 CPU, Web: 0.25 CPU        |
 | **Container Apps Memory**   | N/A                                | N/A                                | API: 1Gi, Web: 0.5Gi               |
 | **Container Replicas**      | N/A                                | N/A                                | 0-3 (scale-to-zero enabled)         |
 | **PostgreSQL Tier**         | N/A                                | N/A                                | B1ms (1 vCore, 2GB RAM, 32GB storage) |
 | **PostgreSQL Replicas**     | N/A                                | N/A                                | 0 (no read replicas)                |
-| **VNet Address Space**      | N/A                                | N/A                                | None (F-09: VNet not configured)    |
-| **Network Isolation**       | N/A                                | N/A                                | None (public internet access)       |
-| **Private Endpoints**       | N/A                                | N/A                                | None                                |
+| **VNet Address Space**      | N/A                                | N/A                                | 10.0.0.0/16 (VNet deployed, F-09 RESOLVED) |
+| **Network Isolation**       | N/A                                | N/A                                | VNet-integrated Container Apps Environment; private endpoints for PostgreSQL, Key Vault |
+| **Private Endpoints**       | N/A                                | N/A                                | psql-cmmc-v2-prod, kv-cmmc-v2-prod (F-12 RESOLVED) |
+| **WAF**                     | N/A                                | N/A                                | App Gateway WAF v2 (appgw-ams)      |
 | **Data**                    | N/A                                | N/A                                | Real production data                |
 | **Backups**                 | N/A                                | N/A                                | PostgreSQL: 7-day automated, LRS    |
-| **Access**                  | N/A                                | N/A                                | Team (no formal RBAC)               |
+| **Access**                  | N/A                                | N/A                                | Managed identity; team access       |
 | **Monitoring**              | N/A                                | N/A                                | Log Analytics (basic)               |
-| **TLS Certificates**        | N/A                                | N/A                                | Azure managed certificates          |
-| **Custom Domain**           | N/A                                | N/A                                | cmmc.intellisecops.com, api.cmmc.intellisecops.com |
+| **TLS Certificates**        | N/A                                | N/A                                | App Gateway certificate + Azure managed certificates |
+| **Custom Domain**           | N/A                                | N/A                                | cmmc.intellisecops.com (via App Gateway WAF v2) |
+| **Backend FQDNs**           | N/A                                | N/A                                | cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io, cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io |
 | **Estimated Monthly Cost**  | N/A                                | N/A                                | CAD ~$35-70                         |
 
 ---
@@ -117,24 +125,25 @@ NOT IMPLEMENTED -- no development environment exists in Azure.
 
 NOT IMPLEMENTED -- no staging environment exists in Azure.
 
-### 5.3 Production Network
+### 5.3 Production Network (prod-v2)
 
 | Component           | Configuration                                    |
 |---------------------|--------------------------------------------------|
-| VNet Name           | NOT IMPLEMENTED (security finding F-09)          |
-| Address Space       | N/A                                              |
-| Subnets             | N/A                                              |
+| VNet Name           | VNet (prod-v2) -- DEPLOYED (F-09 RESOLVED)       |
+| Address Space       | 10.0.0.0/16                                      |
+| Subnets             | snet-container-apps (10.0.0.0/23), snet-postgresql (10.0.2.0/24), snet-private-endpoints (10.0.3.0/24) |
 | VNet Peering        | N/A                                              |
-| Private Endpoints   | None                                             |
-| DNS Resolution      | GoDaddy (external DNS)                           |
+| Private Endpoints   | psql-cmmc-v2-prod (PostgreSQL), kv-cmmc-v2-prod (Key Vault) |
+| WAF                 | App Gateway WAF v2 (appgw-ams)                   |
+| DNS Resolution      | Custom domain cmmc.intellisecops.com via App Gateway; private DNS zones for VNet services |
 
-> **Current State:** The production environment has no VNet. Container Apps use external ingress. PostgreSQL uses AllowAzureServices firewall rule (0.0.0.0). All services are accessible over the public internet.
+> **Current State:** The prod-v2 environment has full VNet isolation. Container Apps Environment (cae-cmmc-v2-prod) is VNet-integrated. PostgreSQL and Key Vault use private endpoints with no public access. Traffic to cmmc.intellisecops.com routes through App Gateway WAF v2 (appgw-ams). All security findings (F-09, F-12) are RESOLVED.
 
 ### Planned Improvements
 
-- Deploy VNet with proper subnet design for Container Apps Environment (F-09)
-- Configure private endpoints for PostgreSQL and Key Vault
-- Remove AllowAzureServices firewall rule from PostgreSQL (F-12)
+- ~~Deploy VNet with proper subnet design for Container Apps Environment (F-09)~~ -- **DEPLOYED** (2026-02-15)
+- ~~Configure private endpoints for PostgreSQL and Key Vault~~ -- **DEPLOYED** (2026-02-15)
+- ~~Remove AllowAzureServices firewall rule from PostgreSQL (F-12)~~ -- **RESOLVED** (2026-02-15)
 
 ---
 
@@ -152,7 +161,8 @@ NOT IMPLEMENTED -- no staging environment exists in Azure.
 
 | Identity Name                    | Type                | Environment  | Purpose                              | Permissions                  |
 |----------------------------------|---------------------|--------------|--------------------------------------|------------------------------|
-| GitHub Actions Service Principal | Service Principal   | Production   | CD pipeline deployments              | Contributor on resource group |
+| GitHub Actions Service Principal | Service Principal   | Production (prod-v2) | CD pipeline deployments        | Contributor on resource group |
+| Container Apps Managed Identity  | System-assigned Managed Identity | Production (prod-v2) | Key Vault, PostgreSQL, ACR access (F-11 RESOLVED) | Key Vault Secrets User, ACR Pull |
 
 ### 6.3 Privileged Access Management
 
@@ -181,7 +191,7 @@ NOT IMPLEMENTED -- no staging environment exists in Azure.
 | App Configuration Instance    | NOT IMPLEMENTED                                   |
 | Feature Management Enabled    | No                                                |
 | Key-Value Naming Convention   | N/A                                               |
-| Key Vault References          | Secrets stored in Key Vault (kv-cmmc-assessor-prod), referenced as Container App secrets |
+| Key Vault References          | Secrets stored in Key Vault (kv-cmmc-v2-prod), referenced via Key Vault refs with managed identity |
 | Label Strategy                | N/A                                               |
 
 ### 7.2 Environment-Specific Settings
@@ -189,10 +199,10 @@ NOT IMPLEMENTED -- no staging environment exists in Azure.
 | Setting Category       | Production Value                                    |
 |------------------------|-----------------------------------------------------|
 | Log Level              | Console.log (unstructured, F-30)                    |
-| API Rate Limiting      | NOT IMPLEMENTED                                     |
+| API Rate Limiting      | express-rate-limit with tiered limits (F-04 RESOLVED) |
 | Caching TTL            | Not configured                                      |
-| Connection Strings     | Key Vault references for PostgreSQL                 |
-| CORS                   | Allows custom domain + localhost in prod (F-40)     |
+| Connection Strings     | Key Vault references (kv-cmmc-v2-prod) via managed identity |
+| CORS                   | Strict allowlist for cmmc.intellisecops.com only (F-40 RESOLVED) |
 
 ---
 
@@ -237,7 +247,7 @@ Developer PR --> Main Branch --> PRODUCTION Deploy (auto)
 
 | Artifact Type        | Source                      | Promotion Method                                |
 |----------------------|-----------------------------|-------------------------------------------------|
-| Container Images     | GitHub Actions build        | Push to ACR (acrcmmcassessorprod), deploy to Container Apps |
+| Container Images     | GitHub Actions build        | Push to ACR (acrcmmcv2prod), deploy to Container Apps in prod-v2 |
 | IaC Templates        | Git repository              | Single main.bicep with parameters.prod.json      |
 | Database Migrations  | Git repository (Prisma)     | Prisma migrate deploy runs on container startup  |
 
@@ -275,3 +285,4 @@ Developer PR --> Main Branch --> PRODUCTION Deploy (auto)
 | Date           | Author               | Changes Made                              |
 |----------------|-----------------------|-------------------------------------------|
 | 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |
+| 2026-02-15     | IntelliSec Solutions  | Updated for prod-v2 migration to sub-is-secops-prod (400dce0f); added prod-v2 resources, FQDNs, custom domain; VNet isolation, private endpoints, Key Vault refs, managed identity, App Gateway WAF v2; all 47 findings resolved |

@@ -104,7 +104,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 | **Container Registry** | Azure Container Registry | Basic | Private Docker image storage, integrated with Container Apps |
 | **CI/CD** | GitHub Actions | N/A | Native GitHub integration, OIDC federation to Azure (no stored credentials), Bicep IaC deployment |
 | **IaC** | Bicep | Latest | Azure-native, declarative, first-class ARM template compilation, simpler than Terraform for Azure-only workloads |
-| **Logging** | Azure Log Analytics | PerGB2018 | Centralized log aggregation from Container Apps, 30-day retention |
+| **Logging** | pino + Azure Log Analytics | PerGB2018 | pino structured JSON logging; centralized log aggregation from Container Apps, 30-day retention |
 
 ---
 
@@ -129,9 +129,9 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 
 | Aspect | Approach |
 |--------|----------|
-| Identity Provider | Microsoft Entra ID (Azure AD) -- primary; legacy username/password as fallback |
+| Identity Provider | Microsoft Entra ID (Azure AD) -- primary; legacy username/password login removed |
 | Authentication Protocol | OAuth 2.0 Authorization Code Flow with PKCE (via OIDC) for Entra ID; JWT-based session management |
-| Token Format | Custom JWTs issued by the backend after Entra ID validation; configurable expiry (currently 7 days) |
+| Token Format | Custom JWTs issued by the backend after Entra ID validation; 15-minute expiry with refresh token rotation |
 | Refresh Token Strategy | Refresh tokens stored in PostgreSQL with token family rotation detection; compromised family triggers full revocation |
 | API Authorization | Two-tier RBAC enforced at middleware level: platform roles (SUPER_ADMIN, SUPPORT, USER) and team roles (OWNER, ADMIN, ASSESSOR, MEMBER, VIEWER) |
 | Tenant Isolation | tenantAuth.ts middleware extracts tenant context from JWT and injects scoped Prisma client; all queries automatically filtered by tenantId |
@@ -143,9 +143,9 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 
 | Aspect | Approach |
 |--------|----------|
-| Logging Framework | Console-based structured logging from Container Apps, aggregated by Azure Log Analytics |
+| Logging Framework | pino structured JSON logging from Container Apps, aggregated by Azure Log Analytics (F-30 resolved) |
 | Log Sink | Azure Log Analytics Workspace (log-cmmc-assessor-prod) |
-| Log Format | Container Apps stdout/stderr captured as ContainerAppConsoleLogs |
+| Log Format | pino structured JSON output captured as ContainerAppConsoleLogs |
 | Log Levels | Error, Warning, Info, Debug |
 | PII Handling | User emails and names appear in audit logs by design (required for CMMC audit trail); no payment card data in the system |
 | Retention | 30 days in Log Analytics (current); to be reviewed for compliance requirements |
@@ -157,10 +157,11 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 |--------|----------|
 | APM Tool | Azure Log Analytics with Container Apps built-in metrics |
 | Metrics | Container Apps system metrics (CPU, memory, request count, response time); custom application metrics via structured logging |
+| Structured Logging | pino structured JSON logging implemented; logs ingested by Azure Log Analytics |
 | Distributed Tracing | Not yet implemented; planned for future phases |
 | Dashboards | Azure Portal Container Apps overview dashboard; Log Analytics queries for custom views |
 | Alerting | To be configured via Azure Monitor Alerts (planned) |
-| Health Checks | Container Apps built-in health probes |
+| Health Checks | Container Apps built-in health probes; /api/health endpoint cleaned up (configuration info removed) |
 | SLI/SLO Tracking | Not yet formalized; target availability > 99.5% for production |
 
 ### 8.4 Configuration Management
@@ -177,8 +178,8 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 | Aspect | Approach |
 |--------|----------|
 | Secret Store | Azure Key Vault (kv-cmmc-assessor-prod) |
-| Access Method | Container Apps secret references to Key Vault; OIDC federation for GitHub Actions CI/CD |
-| Secret Rotation | Manual rotation currently; automated rotation planned as part of security remediation |
+| Access Method | Azure Key Vault integrated via managed identity (F-10 resolved); Container Apps secret references to Key Vault; OIDC federation for GitHub Actions CI/CD |
+| Secret Rotation | Manual rotation currently; automated rotation planned for future phase |
 | CI/CD Secrets | GitHub Actions OIDC federation to Azure -- no stored credentials for deployment; GitHub repository secrets for build-time values |
 | Local Development | .env files (gitignored) for local configuration |
 | Graph API Tokens | Microsoft Graph API access/refresh tokens encrypted with AES-256-GCM before storage in PostgreSQL UserToken table |
@@ -209,7 +210,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 | **Availability** | 99.5% uptime target for production | Azure Container Apps managed infrastructure with automatic health checks and restart; PostgreSQL Flexible Server with automated failover capability |
 | **Security** | Tenant data isolation, CUI-appropriate handling, CMMC-aligned security controls | Prisma middleware tenant scoping, Entra ID authentication with inherited MFA, AES-256-GCM token encryption, JWT deny list, helmet security headers, express-rate-limit, input validation via express-validator |
 | **Maintainability** | Single codebase deployable by small team; new developers productive within 1 week | Monorepo structure, TypeScript full stack, Prisma schema as single source of truth for data model, Bicep IaC, automated CI/CD |
-| **Reliability** | No data loss for assessment data; graceful error handling for Graph API failures | PostgreSQL automated backups (7-day PITR, upgrading to 35-day), Express error middleware with consistent error responses, Axios interceptors for token refresh |
+| **Reliability** | No data loss for assessment data; graceful error handling for Graph API failures | PostgreSQL automated backups (35-day PITR; F-27 resolved), Express error middleware with consistent error responses, Axios interceptors for token refresh |
 | **Compliance** | CMMC assessment platform must demonstrate security practices consistent with CMMC Level 2 | Audit logging (AuditLog table), RBAC enforcement, data encryption at rest and in transit, tenant isolation, evidence management via SharePoint integration |
 | **Data Residency** | All data must reside within Canada | All Azure services deployed to Canada Central region; no cross-border data transfer except to Microsoft Entra ID and Graph API (governed by Microsoft DPA) |
 
@@ -224,7 +225,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 | 3 | MVP budget constrains infrastructure to burstable/consumption SKUs | Database limited to B1ms (1 vCore, 2GB); Container Apps on consumption plan; no Redis cache or CDN |
 | 4 | Small development team (1-3 developers) | Favors monolithic architecture over microservices; limits operational complexity tolerance; single repository for backend and frontend |
 | 5 | SharePoint is the mandated evidence storage platform (client requirement) | Requires Microsoft Graph API integration with incremental consent; evidence management depends on SharePoint availability and permissions |
-| 6 | 47 security findings identified (4 Critical — resolved 2026-02-15, 10 High — Phase 2 in progress) requiring remediation over 6 months | Architecture decisions must account for security hardening roadmap; some features deferred pending security fixes |
+| 6 | 47 security findings identified and ALL 47 resolved as of 2026-02-15; production migrated to prod-v2 (VNet, WAF, private endpoints, Key Vault managed identity) | Security hardening complete; architecture now includes App Gateway WAF v2 (OWASP CRS 3.2), pino structured logging, JWT 15-min expiry with refresh token rotation, and invitation-only registration via Entra ID |
 
 ---
 
@@ -232,7 +233,7 @@ The CMMC Assessor Platform is a multi-tenant SaaS application designed to stream
 
 | # | Assumption | If Invalid |
 |---|-----------|------------|
-| 1 | Microsoft Entra ID is the primary identity provider for all production users | Legacy username/password auth exists as fallback; if Entra ID is not available, assess migration strategy for legacy accounts |
+| 1 | Microsoft Entra ID is the sole identity provider for all production users (legacy login removed) | No fallback authentication; if Entra ID is unavailable, users cannot authenticate until service is restored |
 | 2 | Peak concurrent usage will not exceed 50 users in Year 1 | PostgreSQL B1ms SKU and Container Apps 0-3 replica scaling may be insufficient; upgrade to GP-tier database and increase max replicas |
 | 3 | SharePoint document libraries are pre-provisioned by tenant administrators before evidence upload | If not, the application must guide users through SharePoint site creation or provide alternative evidence storage |
 | 4 | The team has production experience with Node.js, TypeScript, React, and PostgreSQL | If not, additional training and ramp-up time required; architecture choices may need revisiting |

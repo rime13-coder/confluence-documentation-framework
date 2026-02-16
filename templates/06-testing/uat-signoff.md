@@ -2,7 +2,7 @@
 
 | **Page Title**   | UAT Sign-Off                               |
 |------------------|--------------------------------------------|
-| **Last Updated** | 2026-02-14                                 |
+| **Last Updated** | 2026-02-15                                 |
 | **Status**       | Draft                                      |
 | **Owner**        | IntelliSecOps Product Team                 |
 
@@ -209,7 +209,7 @@ The following issues are known from the security review and current state of the
 |------------------|-----------------------------------------------------------|-----------|-------------------------------------------------|--------------------|---------------|
 | KNOWN-001        | No staging environment for pre-production validation      | High      | Testing conducted directly in production with caution | TBD (staging provisioning) | TBD    |
 | KNOWN-002        | No automated test suites (unit, integration, E2E)         | High      | Manual testing + CI type checking and linting   | TBD                | TBD           |
-| KNOWN-003        | 47 security findings from 2026-02-11 review; Phase 1 Critical (F-01–F-04) ALL RESOLVED 2026-02-15; Phase 2 High (F-05, F-09, F-10, F-12) in progress, deadline 2026-02-25 | Medium | Being actively remediated; tracked in GitHub Issues | Ongoing | TBD |
+| KNOWN-003        | 47 security findings from 2026-02-11 review; ALL 47 findings RESOLVED as of 2026-02-15; prod migrated to prod-v2 with VNet, WAF, private endpoints, Key Vault managed identity | Low | All remediated; Dependabot and npm audit enforced for ongoing monitoring | COMPLETE (2026-02-15) | TBD |
 | KNOWN-004        | No automated smoke tests post-deployment                  | Medium    | Manual verification after each deployment       | TBD                | TBD           |
 
 ### Risk Assessment for Known Issues
@@ -218,7 +218,7 @@ The following issues are known from the security review and current state of the
 |-------------|--------------------------------------------|-------------|-------------|----------------------------------------|
 | KNOWN-001   | Potential for untested changes reaching production | High   | High        | Prioritize staging environment setup   |
 | KNOWN-002   | Regressions may not be caught before deployment | Medium   | High        | Prioritize unit test implementation    |
-| KNOWN-003   | Security vulnerabilities may be exploitable | Medium      | Medium      | Track remediation progress weekly      |
+| KNOWN-003   | All 47 security findings resolved; risk mitigated | Low         | Low         | Ongoing monitoring via Dependabot, npm audit, and WAF |
 | KNOWN-004   | Failed deployments may not be detected quickly | Medium   | Medium      | Manual health check after each deploy  |
 
 ---

@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Monitoring & Alerting              |
-| Last Updated     | 2026-02-14                         |
+| Last Updated     | 2026-02-15                         |
 | Status           | Draft                              |
 | Owner            | IntelliSec Solutions               |
 
@@ -22,13 +22,13 @@ This document defines the observability strategy, monitoring tools, key metrics,
 | Pillar   | Purpose                                              | Primary Tool                       | Status              |
 |----------|------------------------------------------------------|------------------------------------|---------------------|
 | Metrics  | Quantitative measurements of system behavior         | Azure Monitor (basic platform metrics) | Minimal          |
-| Logs     | Detailed event records for debugging and auditing    | Azure Log Analytics (log-cmmc-assessor-prod) | Active (basic) |
+| Logs     | Detailed event records for debugging and auditing    | Azure Log Analytics (log-cmmc-assessor-prod) with pino structured JSON | Active |
 | Traces   | Request-level distributed tracing across services    | NOT IMPLEMENTED                    | NOT IMPLEMENTED     |
 
 ### 2.2 Current State Summary
 
 - Container Apps logs flow to Log Analytics workspace (log-cmmc-assessor-prod)
-- Application uses `console.log` for logging (unstructured, F-30)
+- Application uses pino structured JSON logging (F-30 resolved)
 - No Application Insights deployed
 - No custom dashboards or alerts configured
 - No synthetic monitoring or health checks
@@ -38,7 +38,7 @@ This document defines the observability strategy, monitoring tools, key metrics,
 ### 2.3 Planned Improvements
 
 - Deploy Application Insights for APM and distributed tracing
-- Migrate from `console.log` to structured logging (F-30)
+- ~~Migrate from `console.log` to structured logging (F-30)~~ DONE -- pino structured JSON logging implemented
 - Increase Log Analytics retention from 30 to 90 days (F-43)
 - Configure custom alerts for critical conditions
 - Implement synthetic monitoring / availability tests
@@ -171,7 +171,7 @@ The following alerts should be implemented as a priority:
 
 | Log Source                    | Log Category                      | Destination              | Retention    | Purpose                           |
 |-------------------------------|-----------------------------------|--------------------------|--------------|-----------------------------------|
-| Container Apps (cmmc-api)     | ContainerAppConsoleLogs_CL        | Log Analytics            | 30 days      | API application logs (console.log)|
+| Container Apps (cmmc-api)     | ContainerAppConsoleLogs_CL        | Log Analytics            | 30 days      | API application logs (pino structured JSON) |
 | Container Apps (cmmc-web)     | ContainerAppConsoleLogs_CL        | Log Analytics            | 30 days      | Frontend application logs         |
 | Container Apps (system)       | ContainerAppSystemLogs_CL         | Log Analytics            | 30 days      | Container Apps platform logs      |
 | Application (database)        | AuditLog table                    | PostgreSQL database      | Indefinite   | Business audit trail              |
@@ -249,14 +249,14 @@ ContainerAppSystemLogs_CL
 
 | Endpoint                         | Checks Performed                                              | Expected Response         | Known Issues                   |
 |----------------------------------|---------------------------------------------------------------|---------------------------|--------------------------------|
-| GET /api/health                  | Basic application health                                       | 200 OK with status JSON   | Leaks configuration info (F-38) |
+| GET /api/health                  | Basic application health                                       | 200 OK with status JSON   | Configuration info leak resolved (F-38 resolved) |
 
-> **Note:** Only a single health endpoint exists. There is no readiness probe or liveness probe differentiation. The health endpoint currently returns configuration details that should not be exposed (F-38).
+> **Note:** Only a single health endpoint exists. There is no readiness probe or liveness probe differentiation. The health endpoint has been cleaned up to return only a status indicator (F-38 resolved).
 
 ### Planned Improvements
 
 - Create separate `/api/health/ready` and `/api/health/live` endpoints
-- Remove configuration information from health endpoint response (F-38)
+- ~~Remove configuration information from health endpoint response (F-38)~~ DONE
 - Configure Application Insights availability tests for production URL
 - Set up URL ping tests from multiple global locations
 
@@ -293,3 +293,4 @@ requests
 | Date           | Author               | Changes Made                              |
 |----------------|-----------------------|-------------------------------------------|
 | 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |
+| 2026-02-15     | IntelliSec Solutions  | Updated: F-30 (structured logging) and F-38 (health endpoint) resolved |

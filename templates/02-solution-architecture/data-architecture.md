@@ -25,8 +25,8 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 | cmmc-assessor-prod (PostgreSQL) | Relational (SQL) | Azure Database for PostgreSQL Flexible Server (psql-cmmc-assessor-prod) | B1ms (1 vCore, 2GB RAM) | All application data: tenants, users, assessments, controls, objectives, responses, POA&Ms, policies, audit logs, tokens (22 tables) | Confidential (contains CUI assessment data, user PII, encrypted tokens) | Lifetime of tenant + regulatory retention period | Canada Central |
 | stcmmcassessorprod (Blob Storage) | Object / Blob | Azure Storage Account | Standard_LRS | Evidence file uploads, generated export files (Excel, PDF, DOCX), temporary file staging | Confidential (evidence files may contain CUI) | Lifetime of associated assessment; deletion on tenant offboarding | Canada Central |
 | SharePoint (via Graph API) | Document Library | Microsoft 365 SharePoint Online (external to Azure infrastructure) | Customer's M365 license | Primary evidence document storage and management per tenant's SharePoint site | Confidential (evidence files related to CMMC compliance, may contain CUI) | Managed by tenant's SharePoint retention policies | Determined by tenant's M365 tenant geography |
-| Azure Key Vault (kv-cmmc-assessor-prod) | Secret / Key Store | Azure Key Vault | Standard | Secrets: database connection strings, JWT signing keys, MSAL client secrets, AES-256 encryption keys | Restricted (cryptographic keys and credentials) | Secrets rotated per rotation policy; soft-delete enabled with 90-day purge protection | Canada Central |
-| Azure Log Analytics (log-cmmc-assessor-prod) | Log Store | Azure Log Analytics Workspace | PerGB2018 | Container Apps console logs, system metrics, diagnostic data | Internal (operational logs; may contain user identifiers in audit-related log entries) | 30 days (current); to be reviewed for compliance requirements | Canada Central |
+| Azure Key Vault (kv-cmmc-assessor-prod) | Secret / Key Store | Azure Key Vault | Standard | Secrets: database connection strings, JWT signing keys, MSAL client secrets, AES-256 encryption keys; accessed via managed identity (F-10 resolved) | Restricted (cryptographic keys and credentials) | Secrets rotated per rotation policy; soft-delete enabled with 90-day purge protection | Canada Central |
+| Azure Log Analytics (log-cmmc-assessor-prod) | Log Store | Azure Log Analytics Workspace | PerGB2018 | Container Apps structured JSON logs (pino), system metrics, diagnostic data | Internal (operational logs; may contain user identifiers in audit-related log entries) | 30 days (current); to be reviewed for compliance requirements | Canada Central |
 
 ---
 
@@ -145,7 +145,7 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 | UserTokens (Graph API tokens) | Until token refresh or user revocation | N/A | Overwritten on refresh; deleted on user account deletion | Minimal retention principle |
 | Evidence Files (Blob Storage) | Lifetime of associated assessment | Same as assessment data | Deleted on tenant offboarding; lifecycle policy to move to cool/archive tier planned | CMMC evidence requirements |
 | Evidence Files (SharePoint) | Managed by tenant's SharePoint retention policies | Managed by tenant | N/A (tenant-managed) | Tenant's own compliance requirements |
-| Backup Data (PostgreSQL) | 7 days (current PITR), increasing to 35 days | None currently | Automatic expiry per Azure backup policy | DR requirements |
+| Backup Data (PostgreSQL) | 35 days PITR (F-27 resolved; increased from 7 days) | None currently | Automatic expiry per Azure backup policy | DR requirements |
 | Policy Documents and Versions | Lifetime of tenant subscription | Retained with assessment data | Cascade delete on tenant offboarding | CMMC policy compliance tracking |
 
 ### 6.2 Data Lifecycle Stages
@@ -178,7 +178,7 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 
 | Data Store | Backup Method | Frequency | Retention | RPO | RTO | Geo-Redundancy | Tested |
 |-----------|--------------|-----------|-----------|-----|-----|-----------------|--------|
-| PostgreSQL (psql-cmmc-assessor-prod) | Azure automated backups (point-in-time restore) | Continuous (WAL-based) | 7 days PITR (current); planned increase to 35 days | < 5 minutes | < 1 hour | No (locally redundant backups currently); geo-redundant backup planned | Not yet tested |
+| PostgreSQL (psql-cmmc-assessor-prod) | Azure automated backups (point-in-time restore) | Continuous (WAL-based) | 35 days PITR (F-27 resolved) | < 5 minutes | < 1 hour | No (locally redundant backups currently); geo-redundant backup planned | Not yet tested |
 | Azure Blob Storage (stcmmcassessorprod) | Soft delete + Standard_LRS | Continuous (on write) | 7 days soft delete (planned) | 0 (synchronous writes) | < 30 minutes | No (LRS currently); upgrade to GRS planned | Not yet tested |
 | SharePoint Evidence | Managed by Microsoft 365 (tenant's responsibility) | Continuous (SharePoint versioning) | Per tenant's M365 retention policies | Depends on M365 backup | Depends on M365 recovery | Yes (M365 global infrastructure) | N/A (tenant-managed) |
 | Azure Key Vault (kv-cmmc-assessor-prod) | Azure built-in soft delete + purge protection | Continuous | 90 days soft delete retention | 0 | < 5 minutes (undelete) | No (Standard tier, locally redundant) | Not yet tested |
@@ -193,7 +193,7 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 | Accidental blob deletion | Restore from soft-deleted blobs (if soft delete is enabled) or re-upload from SharePoint source | Development Team | < 30 minutes |
 | Key Vault secret compromise | Rotate compromised secret immediately; update dependent services (Container Apps restart); revoke all active JWTs via TokenDenyList if JWT signing key compromised; force re-authentication for all users | Development Team + Security | 1-4 hours |
 | Container App failure / bad deployment | Revert to previous container image tag in Azure Container Registry; redeploy via GitHub Actions or manual Bicep deployment | Development Team | < 30 minutes |
-| Entra ID integration failure | Verify Entra ID app registration; check client secret expiry; re-consent if needed; legacy auth serves as temporary fallback | Development Team | 30 minutes - 2 hours |
+| Entra ID integration failure | Verify Entra ID app registration; check client secret expiry; re-consent if needed; no fallback (legacy login removed, Entra ID is sole auth provider) | Development Team | 30 minutes - 2 hours |
 
 ### 7.3 Disaster Recovery Testing
 
@@ -204,7 +204,7 @@ This document defines the data architecture for the **CMMC Assessor Platform**. 
 | Success Criteria | RPO and RTO targets met; data integrity verified via row counts and spot checks; all API endpoints operational; tenant isolation verified post-recovery |
 | Documentation | DR test results to be documented in Confluence upon completion |
 
-**Note:** DR testing is identified as a gap and is part of the security remediation roadmap. The 7-day backup retention is being increased to 35 days as an early remediation item.
+**Note:** DR testing is identified as a gap. Backup retention has been increased to 35 days (F-27 resolved). DR testing will be conducted once a formal schedule is established.
 
 ---
 

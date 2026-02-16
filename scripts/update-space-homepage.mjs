@@ -142,20 +142,20 @@ function buildDashboardHtml() {
 <th style="background-color: #f1f5f9; text-align: center; width: 25%;">Next Milestone</th>
 </tr>
 <tr>
-<td style="text-align: center;"><strong>MVP Development</strong><br/>Security Remediation</td>
+<td style="text-align: center;"><strong>Production (prod-v2)</strong><br/>Security Hardened</td>
 <td style="text-align: center;">
 <ac:structured-macro ac:name="status">
-<ac:parameter ac:name="title">ON TRACK</ac:parameter>
+<ac:parameter ac:name="title">COMPLETE</ac:parameter>
 <ac:parameter ac:name="colour">Green</ac:parameter>
 </ac:structured-macro>
-<br/>Phase 1 resolved; Phase 2 in progress</td>
+<br/>All remediation complete</td>
 <td style="text-align: center;">
 <ac:structured-macro ac:name="status">
-<ac:parameter ac:name="title">43 REMAINING</ac:parameter>
-<ac:parameter ac:name="colour">Yellow</ac:parameter>
+<ac:parameter ac:name="title">47/47 RESOLVED</ac:parameter>
+<ac:parameter ac:name="colour">Green</ac:parameter>
 </ac:structured-macro>
-<br/>4 Critical resolved; 10 High in progress</td>
-<td style="text-align: center;"><strong>Phase 2 Deadline</strong><br/>2026-02-25<br/><em>VNet + Key Vault</em></td>
+<br/>Overall risk: LOW</td>
+<td style="text-align: center;"><strong>Next: Gate 4 CAB</strong><br/>2026-02-17<br/><em>Production Go-Live</em></td>
 </tr>
 </tbody>
 </table>
@@ -180,7 +180,7 @@ function buildDashboardHtml() {
 <td><strong>Authentication (Entra ID SSO)</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DONE</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 <td>90%</td>
-<td>OAuth 2.0/OIDC + PKCE, admin consent, token refresh. Redirect URI validation implemented (F-01 resolved)</td>
+<td>OAuth 2.0/OIDC + PKCE, admin consent, HttpOnly cookie auth, refresh token rotation. All auth findings resolved</td>
 </tr>
 <tr>
 <td><strong>Assessment Workflows</strong></td>
@@ -266,16 +266,18 @@ function buildDashboardHtml() {
 </tbody>
 </table>
 
-<ac:structured-macro ac:name="info">
+<ac:structured-macro ac:name="tip">
 <ac:rich-text-body>
-<p><strong>Phase 1 Critical Items — ALL RESOLVED</strong> (completed 2026-02-15)</p>
+<p><strong>ALL 47 Security Findings RESOLVED</strong> (completed 2026-02-15)</p>
+<p>The application was migrated to a hardened production environment (prod-v2) in subscription <code>sub-is-secops-prod</code> with:</p>
 <ul>
-<li>F-01: Open redirect in OAuth callback — RESOLVED (validateRedirectUrl allowlist)</li>
-<li>F-02: No .dockerignore — RESOLVED (.dockerignore created)</li>
-<li>F-03: Open registration — RESOLVED (invitation-only registration)</li>
-<li>F-04: No rate limiting — RESOLVED (express-rate-limit implemented)</li>
+<li>VNet isolation with private endpoints for PostgreSQL, Key Vault, and ACR</li>
+<li>App Gateway WAF v2 (OWASP CRS 3.2, Prevention mode) at cmmc.intellisecops.com</li>
+<li>Key Vault secret references via managed identity (no plain-text secrets)</li>
+<li>HttpOnly cookie auth with 15-min JWT + refresh token rotation</li>
+<li>Structured logging (pino), Dependabot, enforced npm audit</li>
 </ul>
-<p>Phase 2 (High severity) in progress — deadline 2026-02-25.</p>
+<p>Overall Risk Rating: <strong>LOW</strong> (reduced from HIGH)</p>
 </ac:rich-text-body>
 </ac:structured-macro>
 
@@ -304,23 +306,23 @@ function buildDashboardHtml() {
 <tr>
 <td><strong>Phase 2</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">HIGH</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td>
-<td>4 findings (F-05, F-09, F-10, F-12)</td>
+<td>10 findings (F-05 through F-14)</td>
 <td>2026-02-25</td>
-<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">IN PROGRESS</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td>
+<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">RESOLVED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 </tr>
 <tr>
 <td><strong>Phase 3</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">MEDIUM</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td>
-<td>4 findings (F-30, F-31, F-32, F-37)</td>
+<td>22 findings (F-15 through F-36)</td>
 <td>2026-05-11</td>
-<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">NOT STARTED</ac:parameter><ac:parameter ac:name="colour">Grey</ac:parameter></ac:structured-macro></td>
+<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">RESOLVED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 </tr>
 <tr>
 <td><strong>Phase 4</strong></td>
 <td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">LOW</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
-<td>11 remaining findings</td>
+<td>11 findings (F-37 through F-47)</td>
 <td>2026-08-11</td>
-<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">NOT STARTED</ac:parameter><ac:parameter ac:name="colour">Grey</ac:parameter></ac:structured-macro></td>
+<td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">RESOLVED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td>
 </tr>
 </tbody>
 </table>
@@ -353,9 +355,9 @@ function buildDashboardHtml() {
 <tr><td>stcmmcassessorprod</td><td>Blob Storage</td><td>Standard_LRS</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DEPLOYED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td></tr>
 <tr><td>kv-cmmc-assessor-prod</td><td>Key Vault</td><td>Standard</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DEPLOYED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td></tr>
 <tr><td>acrcmmcassessorprod</td><td>Container Registry</td><td>Basic</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DEPLOYED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td></tr>
-<tr><td>VNet + Private Endpoints</td><td>Networking</td><td>—</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">PLANNED</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td></tr>
-<tr><td>WAF / Front Door</td><td>Security</td><td>—</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">PLANNED</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td></tr>
-<tr><td>Staging Environment</td><td>Container Apps</td><td>—</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">NOT STARTED</ac:parameter><ac:parameter ac:name="colour">Grey</ac:parameter></ac:structured-macro></td></tr>
+<tr><td>VNet + Private Endpoints</td><td>Networking</td><td>prod-v2</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DEPLOYED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td></tr>
+<tr><td>App Gateway WAF v2</td><td>Security</td><td>appgw-ams</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">DEPLOYED</ac:parameter><ac:parameter ac:name="colour">Green</ac:parameter></ac:structured-macro></td></tr>
+<tr><td>Staging Environment</td><td>Container Apps</td><td>—</td><td><ac:structured-macro ac:name="status"><ac:parameter ac:name="title">PLANNED</ac:parameter><ac:parameter ac:name="colour">Yellow</ac:parameter></ac:structured-macro></td></tr>
 </tbody>
 </table>
 

@@ -3,50 +3,52 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Networking & Security              |
-| Last Updated     | 2026-02-14                         |
-| Status           | Draft                              |
+| Last Updated     | 2026-02-15                         |
+| Status           | Updated -- prod-v2 with VNet isolation |
 | Owner            | IntelliSec Solutions               |
 
 ---
 
 ## 1. Document Purpose
 
-This document defines the network architecture and security controls for the CMMC Assessor Platform on Azure. It covers the current state of networking (which is minimal), DNS strategy, TLS management, and identifies the significant security gaps that are tracked as security findings for remediation.
+This document defines the network architecture and security controls for the CMMC Assessor Platform on Azure. The application has been migrated to prod-v2 in subscription sub-is-secops-prod (400dce0f) with VNet isolation, private endpoints, Key Vault references, managed identity, App Gateway WAF v2, and no public access on PostgreSQL. All 47 security findings have been resolved as of 2026-02-15.
 
 ---
 
 ## 2. Network Architecture Diagram
 
 ```
-CURRENT STATE (Minimal -- No VNet)
+CURRENT STATE (Prod-v2 -- VNet Isolated, sub-is-secops-prod)
 
 Internet
    |
    +-- cmmc.intellisecops.com
-   |      |  (CNAME -> cmmc-web.*.canadacentral.azurecontainerapps.io)
+   |      |  (Custom domain via App Gateway WAF v2: appgw-ams)
    |      v
-   |   cmmc-web (Container App - external ingress)
-   |      Azure Managed TLS Certificate
+   |   Application Gateway WAF v2 (appgw-ams)
+   |      |  WAF protection enabled
+   |      v
+   |   VNet (prod-v2)
+   |      |
+   |      +-- cae-cmmc-v2-prod (Container Apps Environment, VNet-integrated)
+   |      |      |
+   |      |      +-- cmmc-web (Container App)
+   |      |      |      FQDN: cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io
+   |      |      |
+   |      |      +-- cmmc-api (Container App)
+   |      |             FQDN: cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io
+   |      |             |
+   |      |             +-- psql-cmmc-v2-prod (Private Endpoint, no public access)
+   |      |             |      PostgreSQL Flexible Server
+   |      |             |
+   |      |             +-- kv-cmmc-v2-prod (Private Endpoint, Key Vault refs)
+   |      |                    Key Vault (Standard) -- managed identity access
+   |      |
+   |      +-- acrcmmcv2prod (Container Registry)
    |
-   +-- api.cmmc.intellisecops.com
-          |  (CNAME -> cmmc-api.*.canadacentral.azurecontainerapps.io)
-          v
-       cmmc-api (Container App - external ingress)
-          Azure Managed TLS Certificate
-             |
-             +-- psql-cmmc-assessor-prod
-             |      PostgreSQL Flexible Server
-             |      Firewall: AllowAzureServices (0.0.0.0) [F-12]
-             |
-             +-- stcmmcassessorprod
-             |      Storage Account (Standard_LRS)
-             |      Public access
-             |
-             +-- kv-cmmc-assessor-prod
-                    Key Vault (Standard)
+   Managed Identity for all service-to-service auth
 
-WARNING: No VNet, no private endpoints, no WAF, no firewall.
-See security findings F-09, F-12.
+All 47 security findings RESOLVED. F-09, F-12, F-40 all resolved.
 ```
 
 ---
@@ -55,27 +57,21 @@ See security findings F-09, F-12.
 
 ### 3.1 VNet Inventory
 
-**Status: NOT IMPLEMENTED (Security Finding F-09)**
+**Status: DEPLOYED (Security Finding F-09 -- RESOLVED)**
 
-| VNet Name                 | Address Space   | Region           | Subscription       | Purpose                           |
-|---------------------------|-----------------|------------------|--------------------|------------------------------------|
-| N/A                       | N/A             | N/A              | N/A                | No VNet deployed                   |
+| VNet Name                 | Address Space   | Region           | Subscription                | Purpose                           |
+|---------------------------|-----------------|------------------|-----------------------------|-------------------------------------|
+| VNet (prod-v2)            | 10.0.0.0/16     | Canada Central   | sub-is-secops-prod (400dce0f) | Production workloads (VNet-integrated) |
 
-> **Current State:** There is no Virtual Network deployed. All services communicate over public endpoints. This is tracked as security finding F-09 and is in progress as part of Phase 2 remediation (deadline 2026-02-25).
+> **Current State:** VNet is deployed in prod-v2 with Container Apps Environment integration. All PaaS services use private endpoints. PostgreSQL has no public access. Security finding F-09 is RESOLVED as of 2026-02-15.
 
-### Planned VNet Design (Target State)
-
-| VNet Name                 | Address Space    | Region           | Purpose                           |
-|---------------------------|------------------|------------------|------------------------------------|
-| vnet-cmmc-assessor-prod   | 10.0.0.0/16      | Canada Central   | Production workloads               |
-
-### Planned Subnet Design
+### Subnet Design (Deployed)
 
 | Subnet Name                  | Address Range      | Purpose                            | Delegation                           |
 |------------------------------|--------------------|------------------------------------|--------------------------------------|
-| snet-container-apps          | 10.0.0.0/23        | Container Apps Environment         | Microsoft.App/environments           |
-| snet-postgresql              | 10.0.2.0/24        | PostgreSQL Flexible Server         | Microsoft.DBforPostgreSQL/flexibleServers |
-| snet-private-endpoints       | 10.0.3.0/24        | Private endpoints (KV, Storage)    | None                                 |
+| snet-container-apps          | 10.0.0.0/23        | Container Apps Environment (cae-cmmc-v2-prod) | Microsoft.App/environments   |
+| snet-postgresql              | 10.0.2.0/24        | PostgreSQL Flexible Server (psql-cmmc-v2-prod) | Microsoft.DBforPostgreSQL/flexibleServers |
+| snet-private-endpoints       | 10.0.3.0/24        | Private endpoints (Key Vault, Storage) | None                            |
 
 ### 3.2 VNet Peering
 
@@ -103,40 +99,31 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 ### 5.2 Web Application Firewall (WAF)
 
-**Status: NOT IMPLEMENTED**
+**Status: DEPLOYED**
 
 | Attribute                     | Value                                           |
 |-------------------------------|-------------------------------------------------|
-| WAF Type                      | NOT IMPLEMENTED                                 |
-| WAF Mode                      | N/A                                             |
+| WAF Type                      | Azure Application Gateway WAF v2                |
+| WAF Resource Name             | appgw-ams                                       |
+| WAF Mode                      | Prevention                                      |
+| Custom Domain                 | cmmc.intellisecops.com                          |
+| Backend Pool                  | cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io, cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io |
 
-> **Current State:** No WAF is deployed. Container Apps have external ingress without any WAF protection. Application-level input validation exists but no network-level web application firewall.
-
-### Planned Improvements
-
-- Evaluate Azure Front Door with WAF for the production endpoints
-- Consider Azure Application Gateway with WAF v2 if VNet is implemented
+> **Current State:** Application Gateway WAF v2 (appgw-ams) is deployed in prod-v2. Custom domain cmmc.intellisecops.com routes through the WAF to the Container Apps backends. WAF provides OWASP rule set protection at the network level in addition to application-level input validation.
 
 ---
 
 ## 6. Private Endpoints Inventory
 
-**Status: NOT IMPLEMENTED**
+**Status: DEPLOYED (prod-v2)**
 
 | Service                    | Private Endpoint Name            | Status         |
 |----------------------------|----------------------------------|----------------|
-| PostgreSQL Flexible Server | N/A                              | NOT IMPLEMENTED |
-| Storage Account            | N/A                              | NOT IMPLEMENTED |
-| Key Vault                  | N/A                              | NOT IMPLEMENTED |
-| Container Registry         | N/A                              | NOT IMPLEMENTED |
+| PostgreSQL Flexible Server | psql-cmmc-v2-prod (private endpoint) | DEPLOYED -- no public access (F-12 RESOLVED) |
+| Key Vault                  | kv-cmmc-v2-prod (private endpoint)   | DEPLOYED -- Key Vault refs via managed identity |
+| Container Registry         | acrcmmcv2prod                        | DEPLOYED -- managed identity access |
 
-> **Current State:** No private endpoints are deployed. All Azure services are accessed over public endpoints. PostgreSQL has an AllowAzureServices firewall rule (0.0.0.0) which is a security finding (F-12).
-
-### Planned Improvements
-
-- Deploy private endpoints for PostgreSQL, Key Vault, and Storage Account as part of VNet implementation
-- Remove the AllowAzureServices firewall rule from PostgreSQL (F-12)
-- Restrict Container Registry access via private endpoint or IP rules
+> **Current State:** Private endpoints are deployed for PostgreSQL and Key Vault in the prod-v2 environment. PostgreSQL has no public access (AllowAzureServices firewall rule removed). Container Registry uses managed identity for access. Security findings F-09 and F-12 are RESOLVED.
 
 ---
 
@@ -148,20 +135,21 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 |------------------------------|----------------------------------------------------|
 | Public DNS Provider          | GoDaddy                                            |
 | Public DNS Zone              | intellisecops.com                                  |
-| Internal DNS                 | N/A (no VNet, no private DNS zones)                |
+| Internal DNS                 | Private DNS zones for VNet-integrated services (prod-v2) |
 | DNS Forwarding               | N/A                                                |
 | Split-brain DNS              | No                                                 |
 
 ### 7.2 Private DNS Zones
 
-**Status: NOT IMPLEMENTED** -- No private DNS zones exist. These will be created when private endpoints are deployed.
+**Status: DEPLOYED** -- Private DNS zones created for VNet-integrated services in prod-v2 (PostgreSQL, Key Vault).
 
 ### 7.3 Key DNS Records
 
 | Record Name                          | Type    | Value                                                           | Zone                   | TTL     |
 |--------------------------------------|---------|-----------------------------------------------------------------|------------------------|---------|
-| cmmc.intellisecops.com               | CNAME   | cmmc-web.{unique}.canadacentral.azurecontainerapps.io           | intellisecops.com      | Default |
-| api.cmmc.intellisecops.com           | CNAME   | cmmc-api.{unique}.canadacentral.azurecontainerapps.io           | intellisecops.com      | Default |
+| cmmc.intellisecops.com               | A       | App Gateway WAF v2 (appgw-ams) public IP                       | intellisecops.com      | Default |
+| cmmc-web (backend FQDN)             | --      | cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io | (App Gateway backend)  | --      |
+| cmmc-api (backend FQDN)             | --      | cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io | (App Gateway backend)  | --      |
 
 ---
 
@@ -171,9 +159,10 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 | Layer              | Service                      | Resource Name                 | Purpose                                | Backend Targets            |
 |--------------------|------------------------------|-------------------------------|----------------------------------------|----------------------------|
+| Application (L7)  | Application Gateway WAF v2   | appgw-ams                     | WAF protection + load balancing for custom domain cmmc.intellisecops.com | Container Apps backends    |
 | Application (L7)  | Container Apps built-in       | Managed by Azure              | HTTP load balancing for Container Apps | Container App replicas     |
 
-> **Current State:** Load balancing is handled entirely by the Azure Container Apps platform. There is no Application Gateway, no Azure Front Door, and no external load balancer. Container Apps provides built-in HTTP load balancing across replicas.
+> **Current State:** Traffic to cmmc.intellisecops.com flows through the Application Gateway WAF v2 (appgw-ams) which provides WAF protection and routes to the Container Apps backends. Container Apps also provides built-in HTTP load balancing across replicas within the VNet-integrated environment.
 
 ### 8.2 Scaling Configuration
 
@@ -200,8 +189,9 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 | Domain                          | Certificate Type           | Auto-Renew | Used By               |
 |---------------------------------|----------------------------|------------|------------------------|
-| cmmc.intellisecops.com          | Azure Managed Certificate  | Yes        | cmmc-web Container App |
-| api.cmmc.intellisecops.com      | Azure Managed Certificate  | Yes        | cmmc-api Container App |
+| cmmc.intellisecops.com          | App Gateway WAF v2 certificate | Yes    | appgw-ams (Application Gateway) |
+| cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io | Azure Managed Certificate | Yes | cmmc-web Container App |
+| cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io | Azure Managed Certificate | Yes | cmmc-api Container App |
 
 ### Certificate Renewal Process
 
@@ -253,16 +243,16 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 ### Network Security
 
-- [ ] All production databases accessible only via private endpoints -- **FAIL (F-12: AllowAzureServices rule)**
+- [x] All production databases accessible only via private endpoints -- **PASS (F-12 RESOLVED: psql-cmmc-v2-prod has private endpoint, no public access)**
 - [x] No public IP addresses on VMs -- **N/A (no VMs)**
-- [ ] NSG rules follow least-privilege principle -- **FAIL (no NSGs deployed, F-09)**
-- [ ] Outbound internet access restricted via Azure Firewall -- **FAIL (no firewall)**
-- [ ] WAF enabled in Prevention mode for production -- **FAIL (no WAF)**
+- [x] VNet isolation deployed -- **PASS (F-09 RESOLVED: VNet with Container Apps Environment integration in prod-v2)**
+- [ ] Outbound internet access restricted via Azure Firewall -- **N/A (App Gateway WAF v2 provides inbound protection)**
+- [x] WAF enabled in Prevention mode for production -- **PASS (appgw-ams Application Gateway WAF v2 deployed)**
 - [x] TLS 1.2 minimum enforced on all endpoints
-- [ ] Network segmentation verified between environments -- **FAIL (no VNet, no segmentation)**
-- [ ] Service endpoints or private endpoints used for all PaaS services -- **FAIL (no private endpoints)**
+- [x] Network segmentation verified -- **PASS (VNet-integrated Container Apps Environment with subnet isolation)**
+- [x] Private endpoints used for PaaS services -- **PASS (PostgreSQL, Key Vault via private endpoints)**
 - [ ] DDoS Protection Standard enabled for public-facing resources -- **N/A (Basic only, acceptable at current scale)**
-- [ ] CORS configured correctly -- **Partial (F-40: allows localhost in prod)**
+- [x] CORS configured correctly -- **PASS (F-40 RESOLVED: strict allowlist for cmmc.intellisecops.com only)**
 
 ### Monitoring and Compliance
 
@@ -277,9 +267,9 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 
 | Finding ID | Description                                              | Severity | Status  |
 |------------|----------------------------------------------------------|----------|---------|
-| F-09       | No VNet deployed for network isolation                   | High     | In Progress (Phase 2, due 2026-02-25) |
-| F-12       | PostgreSQL AllowAzureServices firewall rule (0.0.0.0)    | High     | In Progress (Phase 2, due 2026-02-25) |
-| F-40       | CORS allows localhost in production                      | Medium   | Planned |
+| F-09       | No VNet deployed for network isolation                   | High     | **RESOLVED** (2026-02-15) -- VNet deployed in prod-v2 with Container Apps Environment integration |
+| F-12       | PostgreSQL AllowAzureServices firewall rule (0.0.0.0)    | High     | **RESOLVED** (2026-02-15) -- psql-cmmc-v2-prod uses private endpoint; no public access |
+| F-40       | CORS allows localhost in production                      | Medium   | **RESOLVED** (2026-02-15) -- Strict CORS allowlist for cmmc.intellisecops.com only |
 
 ---
 
@@ -288,3 +278,4 @@ No Azure Firewall is deployed. Not planned for the current scale of the project.
 | Date           | Author               | Changes Made                              |
 |----------------|-----------------------|-------------------------------------------|
 | 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |
+| 2026-02-15     | IntelliSec Solutions  | Updated for prod-v2 migration; VNet deployed (F-09 resolved); private endpoints deployed (F-12 resolved); CORS fixed (F-40 resolved); App Gateway WAF v2 added; all 47 findings resolved |

@@ -144,7 +144,7 @@ This application does **not** use a message broker or event bus. All communicati
 | Rate Limits | Subject to Microsoft identity platform throttling (not typically hit at MVP scale) |
 | SLA | 99.99% (Microsoft Entra ID SLA) |
 | Data Exchanged | Authorization codes, access tokens, ID tokens, refresh tokens, user profile claims (name, email, oid, tid) |
-| Fallback Strategy | Legacy username/password authentication available as fallback if Entra ID is unavailable or tenant cannot use Entra ID |
+| Fallback Strategy | Legacy username/password login has been removed; authentication is exclusively via Microsoft Entra ID (invitation-only registration) |
 
 #### 6.1.1 Entra ID Authentication Flows
 
@@ -206,7 +206,7 @@ This application does **not** use a message broker or event bus. All communicati
 |-----------|---------|--------|----------|----------|
 | Entra ID Access Token | Used transiently in backend (not stored raw) | ~1 hour (Entra ID default) | Automatic via MSAL token cache | Used only for initial user validation; not stored after JWT issuance |
 | Entra ID ID Token | Used transiently for claims extraction | ~1 hour | N/A (one-time use for claims) | Claims extracted and discarded |
-| Custom JWT (Platform Access Token) | Client-side (memory or httpOnly cookie) | 7 days (configurable via JWT_EXPIRY) | Refresh token rotation | Verified on every API request; deny list checked for revocation |
+| Custom JWT (Platform Access Token) | HttpOnly secure cookie (F-05 resolved; JWT no longer passed in URLs or localStorage) | 15 minutes (hardened from 7 days) | Refresh token rotation | Verified on every API request; deny list checked for revocation |
 | Refresh Token | PostgreSQL (RefreshToken table) | 30 days | Family-based rotation: each use issues new refresh token; reuse of old token revokes entire family | Family tracking detects token theft |
 | Graph API Access Token | PostgreSQL (UserToken table, AES-256-GCM encrypted) | ~1 hour | Automatic refresh via MSAL when expired | Application-layer encryption before storage; decrypted only for Graph API calls |
 | Graph API Refresh Token | PostgreSQL (UserToken table, AES-256-GCM encrypted) | 90 days (Microsoft default) | Used to obtain new Graph API access tokens | Same encryption as access token |
@@ -298,7 +298,7 @@ This application does **not** use a message broker or event bus. All communicati
 
 | Service | Criticality | Single Point of Failure? | Alternative Provider | Migration Effort | Contract |
 |---------|------------|-------------------------|---------------------|-----------------|----------|
-| Microsoft Entra ID | Critical (primary auth) | Yes for Entra ID auth; legacy auth is fallback | No practical alternative for enterprise SSO | N/A (deeply integrated) | Microsoft Azure subscription |
+| Microsoft Entra ID | Critical (sole auth provider) | Yes (legacy login removed; no fallback) | No practical alternative for enterprise SSO | N/A (deeply integrated) | Microsoft Azure subscription |
 | Microsoft Graph API (SharePoint) | High (evidence management) | No (evidence management is optional/supplementary to core assessment functionality) | Azure Blob Storage as alternative evidence store | Medium (2-4 weeks) | Microsoft Azure subscription |
 | GoDaddy DNS | Low (static config) | No (DNS can be migrated to any provider) | Azure DNS, Cloudflare, Route 53 | Low (< 1 day) | Annual domain registration |
 | Azure Container Apps | Critical (hosting) | Yes (application hosting) | Azure App Service, AKS | Medium (2-4 weeks) | Microsoft Azure subscription |

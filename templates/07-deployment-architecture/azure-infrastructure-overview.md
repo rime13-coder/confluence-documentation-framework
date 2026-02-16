@@ -3,8 +3,8 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Azure Infrastructure Overview      |
-| Last Updated     | 2026-02-14                         |
-| Status           | Draft                              |
+| Last Updated     | 2026-02-15                         |
+| Status           | Updated -- prod-v2 migration       |
 | Owner            | IntelliSec Solutions               |
 
 ---
@@ -29,9 +29,10 @@ This document provides a comprehensive overview of the Azure infrastructure unde
 
 | Subscription Name          | Subscription ID                        | Purpose                  | Environment        | Monthly Budget |
 |----------------------------|----------------------------------------|--------------------------|---------------------|----------------|
-| CMMC Assessor Production   | (Refer to Azure Portal)               | All workloads            | Production          | CAD ~$70       |
+| CMMC Assessor Production (legacy) | (Refer to Azure Portal)         | Legacy workloads (deprecated) | Production (legacy) | CAD ~$70       |
+| sub-is-secops-prod         | 400dce0f                               | Production workloads (prod-v2) | Production          | CAD ~$70       |
 
-> **Note:** Only a single subscription exists. There are no separate subscriptions for non-production or shared services. A staging/dev subscription is planned but NOT IMPLEMENTED.
+> **Note:** The application has been migrated to the prod-v2 environment in subscription sub-is-secops-prod (400dce0f) as of 2026-02-15. The legacy subscription is deprecated. A staging/dev subscription is planned but NOT IMPLEMENTED.
 
 ### 2.3 Management Group Hierarchy
 
@@ -94,16 +95,30 @@ The project operates under a single subscription with a single resource group.
 
 ## 5. Azure Services Inventory
 
+### Legacy Resources (Deprecated)
+
 | Service Type             | Resource Name                  | SKU / Tier                    | Resource Group              | Region           | Purpose                            | Monthly Cost Estimate (CAD) |
 |--------------------------|--------------------------------|-------------------------------|-----------------------------|-----------------|------------------------------------|------------------------------|
-| Container Apps           | cmmc-api                       | Consumption (0.5 CPU, 1Gi)   | rg-cmmc-assessor-prod       | Canada Central   | Backend API service                | $0-35                        |
-| Container Apps           | cmmc-web                       | Consumption (0.25 CPU, 0.5Gi)| rg-cmmc-assessor-prod       | Canada Central   | Frontend web application           | $0-10                        |
-| Container Registry       | acrcmmcassessorprod             | Basic                         | rg-cmmc-assessor-prod       | Canada Central   | Container image storage            | ~$7                          |
-| PostgreSQL Flexible      | psql-cmmc-assessor-prod         | B1ms (1 vCore, 2GB, 32GB)   | rg-cmmc-assessor-prod       | Canada Central   | Primary relational datastore       | ~$22                         |
-| Storage Account          | stcmmcassessorprod              | Standard_LRS                  | rg-cmmc-assessor-prod       | Canada Central   | Blob and file storage              | ~$2                          |
-| Key Vault                | kv-cmmc-assessor-prod           | Standard                      | rg-cmmc-assessor-prod       | Canada Central   | Secrets management                 | ~$4                          |
-| Log Analytics            | log-cmmc-assessor-prod          | PerGB2018 (30-day retention) | rg-cmmc-assessor-prod       | Canada Central   | Centralized log aggregation        | ~$0 (free tier)              |
-| Container Apps Environment | cae-cmmc-assessor-prod        | Consumption                   | rg-cmmc-assessor-prod       | Canada Central   | Container Apps hosting environment | Included                     |
+| Container Apps           | cmmc-api                       | Consumption (0.5 CPU, 1Gi)   | rg-cmmc-assessor-prod       | Canada Central   | Backend API service (legacy)       | Deprecated                   |
+| Container Apps           | cmmc-web                       | Consumption (0.25 CPU, 0.5Gi)| rg-cmmc-assessor-prod       | Canada Central   | Frontend web application (legacy)  | Deprecated                   |
+| Container Registry       | acrcmmcassessorprod             | Basic                         | rg-cmmc-assessor-prod       | Canada Central   | Container image storage (legacy)   | Deprecated                   |
+| PostgreSQL Flexible      | psql-cmmc-assessor-prod         | B1ms (1 vCore, 2GB, 32GB)   | rg-cmmc-assessor-prod       | Canada Central   | Primary relational datastore (legacy) | Deprecated                |
+| Storage Account          | stcmmcassessorprod              | Standard_LRS                  | rg-cmmc-assessor-prod       | Canada Central   | Blob and file storage (legacy)     | Deprecated                   |
+| Key Vault                | kv-cmmc-assessor-prod           | Standard                      | rg-cmmc-assessor-prod       | Canada Central   | Secrets management (legacy)        | Deprecated                   |
+| Log Analytics            | log-cmmc-assessor-prod          | PerGB2018 (30-day retention) | rg-cmmc-assessor-prod       | Canada Central   | Centralized log aggregation (legacy) | Deprecated                 |
+| Container Apps Environment | cae-cmmc-assessor-prod        | Consumption                   | rg-cmmc-assessor-prod       | Canada Central   | Container Apps hosting (legacy)    | Deprecated                   |
+
+### Prod-v2 Resources (Active -- sub-is-secops-prod / 400dce0f)
+
+| Service Type             | Resource Name                  | SKU / Tier                    | Subscription                | Region           | Purpose                            | Monthly Cost Estimate (CAD) |
+|--------------------------|--------------------------------|-------------------------------|-----------------------------|-----------------|------------------------------------|------------------------------|
+| Container Registry       | acrcmmcv2prod                   | Basic                         | sub-is-secops-prod          | Canada Central   | Container image storage            | ~$7                          |
+| PostgreSQL Flexible      | psql-cmmc-v2-prod               | B1ms (1 vCore, 2GB, 32GB)   | sub-is-secops-prod          | Canada Central   | Primary relational datastore (private endpoint, no public access) | ~$22 |
+| Key Vault                | kv-cmmc-v2-prod                 | Standard                      | sub-is-secops-prod          | Canada Central   | Secrets management (private endpoint, Key Vault refs) | ~$4    |
+| Container Apps Environment | cae-cmmc-v2-prod              | Consumption (VNet-integrated) | sub-is-secops-prod          | Canada Central   | Container Apps hosting environment with VNet isolation | Included |
+| Container Apps           | cmmc-api                       | Consumption (0.5 CPU, 1Gi)   | sub-is-secops-prod          | Canada Central   | Backend API service (FQDN: cmmc-api.happybush-78cb0e6a.canadacentral.azurecontainerapps.io) | $0-35 |
+| Container Apps           | cmmc-web                       | Consumption (0.25 CPU, 0.5Gi)| sub-is-secops-prod          | Canada Central   | Frontend web application (FQDN: cmmc-web.happybush-78cb0e6a.canadacentral.azurecontainerapps.io) | $0-10 |
+| Application Gateway      | appgw-ams                      | WAF v2                        | sub-is-secops-prod          | Canada Central   | Web Application Firewall; custom domain cmmc.intellisecops.com | Included |
 | **Total**                |                                 |                               |                             |                  |                                    | **~$35-70**                  |
 
 ---
@@ -114,14 +129,14 @@ The project operates under a single subscription with a single resource group.
 |-------------------------------------|------------------------------------------------------------|
 | Landing Zone Framework              | N/A -- no landing zone framework adopted                   |
 | Reference Architecture              | N/A                                                        |
-| Hub-Spoke / Virtual WAN             | N/A -- no VNet deployed (security finding F-09)            |
+| Hub-Spoke / Virtual WAN             | VNet deployed in prod-v2 with Container Apps Environment integration (F-09 RESOLVED) |
 | Platform Landing Zone               | N/A                                                        |
 | Application Landing Zone            | Single resource group, flat architecture                   |
 
 ### Landing Zone Compliance Checklist
 
 - [ ] Identity and access management aligned with landing zone design -- **NOT IMPLEMENTED**
-- [ ] Network topology follows hub-spoke / Virtual WAN pattern -- **NOT IMPLEMENTED (F-09)**
+- [x] Network topology follows VNet integration pattern -- **DEPLOYED in prod-v2 (F-09 RESOLVED)**
 - [ ] Logging and monitoring centralized in management subscription -- **Partial: Log Analytics exists but limited**
 - [ ] Security baselines applied via Azure Policy -- **NOT IMPLEMENTED**
 - [ ] Subscription vending process defined -- **N/A (single subscription)**
@@ -129,7 +144,7 @@ The project operates under a single subscription with a single resource group.
 ### Planned Improvements
 
 - Adopt Azure Landing Zone best practices as the project matures
-- Implement VNet integration as part of Phase 2 remediation (F-09, deadline 2026-02-25)
+- ~~Implement VNet integration as part of Phase 2 remediation (F-09, deadline 2026-02-25)~~ -- **DEPLOYED** in prod-v2 (2026-02-15)
 
 ---
 
@@ -216,7 +231,7 @@ N/A -- Azure Blueprints are not used.
 |-----------------------|------------------------|----------------------|----------------------|
 | CMMC Level 2          | In Progress            | Continuous           | IntelliSec Solutions |
 
-> **Note:** The platform itself is a CMMC assessment tool. The platform's own compliance posture is being hardened through ongoing security remediation. Phase 1 Critical findings (F-01 through F-04) were resolved 2026-02-15. Phase 2 High findings (F-05, F-09, F-10, F-12) are in progress with deadline 2026-02-25. Phases 3-4 cover the remaining 33 Medium/Low findings.
+> **Note:** The platform itself is a CMMC assessment tool. All 47 security findings (4 Critical, 10 High, 22 Medium, 11 Low) have been resolved as of 2026-02-15. The application has been migrated to prod-v2 in subscription sub-is-secops-prod (400dce0f) with VNet isolation, private endpoints, Key Vault references, managed identity, and no public access on PostgreSQL. Overall risk rating: LOW.
 
 ---
 
@@ -225,3 +240,4 @@ N/A -- Azure Blueprints are not used.
 | Date           | Author            | Changes Made                              |
 |----------------|-------------------|-------------------------------------------|
 | 2026-02-14     | IntelliSec Solutions | Initial document creation              |
+| 2026-02-15     | IntelliSec Solutions | Updated for prod-v2 migration to sub-is-secops-prod; added prod-v2 resource inventory; all 47 findings resolved; VNet deployed |

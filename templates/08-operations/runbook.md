@@ -3,7 +3,7 @@
 | **Metadata**     | **Value**                          |
 |------------------|------------------------------------|
 | Page Title       | Runbook -- CMMC Assessor Platform  |
-| Last Updated     | 2026-02-14                         |
+| Last Updated     | 2026-02-15                         |
 | Status           | Draft                              |
 | Owner            | IntelliSec Solutions               |
 
@@ -72,7 +72,7 @@ Supporting:
 |-------------|------------------------------------------|----------------------------------------------|---------------------------------|
 | Production  | https://cmmc.intellisecops.com           | https://api.cmmc.intellisecops.com/api/health | N/A (no status page)           |
 
-> **Note:** The health endpoint (`GET /api/health`) currently leaks configuration information (security finding F-38). This should be remediated to return only a status indicator.
+> **Note:** The health endpoint (`GET /api/health`) has been cleaned up to return only a status indicator (F-38 resolved).
 
 ### Monitoring URLs
 
@@ -201,7 +201,7 @@ Supporting:
 | 5    | **Via Azure CLI (stream logs)**                               | `az containerapp logs show --name cmmc-api --resource-group rg-cmmc-assessor-prod --follow` |
 | 6    | **Export logs for external sharing**                          | Azure Portal > Log Analytics > Logs > Export to CSV                                  |
 
-> **Note:** Logs are currently console.log based (unstructured). Searching for specific issues may require keyword searching. Structured logging is planned (F-30).
+> **Note:** Logs now use pino structured JSON format (F-30 resolved). Log entries are machine-parseable and can be queried efficiently in Log Analytics using JSON field extraction.
 
 **Verification:**
 - [ ] Relevant log entries retrieved successfully
@@ -254,7 +254,7 @@ Supporting:
 | 3 | 500 errors on API endpoints                    | Application exception, database migration issue | Check Container App logs in Log Analytics                 | 4.4             |
 | 4 | Database connection timeout                    | Connection pool exhausted, PostgreSQL firewall   | Check PostgreSQL status, restart API Container App        | 4.1, 4.3        |
 | 5 | Container App stuck in provisioning            | Image pull failure, ACR authentication issue    | Check ACR credentials, verify image tag exists             | 4.5             |
-| 6 | Health endpoint returns config info            | Known issue (F-38)                              | Not a runtime issue; remediation planned                  | N/A             |
+| 6 | Health endpoint returns config info            | Resolved (F-38)                                 | Health endpoint cleaned up; returns only status indicator  | N/A             |
 | 7 | CORS errors in browser                         | CORS misconfiguration                           | Check Bicep CORS settings, verify allowed origins          | N/A             |
 | 8 | Prisma migration fails on startup             | Schema conflict, database connectivity          | Check migration status, review Prisma logs                 | 4.3, 4.4        |
 | 9 | Deployment pipeline failing                    | GitHub Actions runner issue, ACR push failure   | Check pipeline logs, verify service principal credentials  | N/A             |
@@ -297,3 +297,4 @@ Supporting:
 | Date           | Author               | Changes Made                              |
 |----------------|-----------------------|-------------------------------------------|
 | 2026-02-14     | IntelliSec Solutions  | Initial document creation                 |
+| 2026-02-15     | IntelliSec Solutions  | Updated: F-30 (structured logging) and F-38 (health endpoint) resolved |
