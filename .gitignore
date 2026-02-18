@@ -6,6 +6,7 @@ scripts/config.yaml
 scripts/config.json
 scripts/config-m365.yaml
 scripts/config-m365.json
+scripts/config-iso27001.json
 
 # OS files
 .DS_Store
